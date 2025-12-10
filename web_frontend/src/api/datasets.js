@@ -23,8 +23,8 @@ export const datasetsApi = {
   
   // 获取数据集样本
   getDatasetSamples(datasetName, split = 'train', limit = 10) {
-    return api.get(`/datasets/${datasetName}/samples`, {
-      params: { split, limit }
+    return api.get(`/datasets/samples`, {
+      params: { dataset_name: datasetName, split, limit }
     })
   },
   

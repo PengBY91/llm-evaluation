@@ -36,6 +36,16 @@ export const tasksApi = {
     return api.get(`/tasks/${taskId}/progress`)
   },
   
+  // 启动任务
+  startTask(taskId) {
+    return api.post(`/tasks/${taskId}/start`)
+  },
+
+  // 停止任务
+  stopTask(taskId) {
+    return api.post(`/tasks/${taskId}/stop`)
+  },
+  
   // 获取可用任务列表
   getAvailableTasks() {
     return api.get('/tasks/available-tasks/list')

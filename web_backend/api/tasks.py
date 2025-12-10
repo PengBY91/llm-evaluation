@@ -139,6 +139,7 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         "result_file": None,
         "error_message": None,
         "config_id": request.config_id,
+        "original_request_data": request.dict() # Store the request data
     }
 
     with tasks_lock:
@@ -148,6 +149,52 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
     background_tasks.add_task(run_evaluation, task_id, request)
 
     return TaskResponse(**task_data)
+
+
+@router.post("/{task_id}/start")
+async def start_task(task_id: str, background_tasks: BackgroundTasks):
+    """启动评测任务"""
+    with tasks_lock:
+        if task_id not in tasks_db:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        
+        task = tasks_db[task_id]
+        
+        if task["status"] == "running" or task["status"] == "pending":
+            raise HTTPException(status_code=400, detail="任务正在运行或等待中，无法重复启动")
+        
+        # 重置任务状态并重新启动
+        task["status"] = "pending"
+        task["error_message"] = None
+        task["progress"] = None
+        task["updated_at"] = datetime.now().isoformat()
+        task["result_file"] = None # Clear old results
+
+        # Re-add to background tasks with original request data
+        original_request = TaskCreateRequest(**task["original_request_data"])
+        background_tasks.add_task(run_evaluation, task_id, original_request)
+        
+    return {"message": "任务已启动"}
+
+
+@router.post("/{task_id}/stop")
+async def stop_task(task_id: str):
+    """终止评测任务"""
+    with tasks_lock:
+        if task_id not in tasks_db:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        
+        task = tasks_db[task_id]
+        
+        if task["status"] != "running":
+            raise HTTPException(status_code=400, detail="任务未在运行，无法终止")
+        
+        task["status"] = "failed" # Mark as failed due to manual stop
+        task["error_message"] = "任务被用户手动终止" # Task manually stopped by user
+        task["updated_at"] = datetime.now().isoformat()
+        
+    return {"message": "任务已终止"}
+
 
 
 @router.get("/", response_model=List[TaskResponse])

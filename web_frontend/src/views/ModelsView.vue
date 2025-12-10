@@ -2,7 +2,7 @@
   <div class="models-view">
     <div class="view-header">
       <h2>模型管理</h2>
-      <el-button type="primary" @click="showCreateDialog = true">
+      <el-button type="primary" @click="handleAddModel">
         <el-icon><Plus /></el-icon>
         添加模型
       </el-button>
@@ -15,30 +15,78 @@
           <el-tag>{{ getModelTypeLabel(row.model_type) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="model_name" label="模型标识" width="150" />
-      <el-table-column prop="base_url" label="Base URL" width="200" show-overflow-tooltip />
-      <el-table-column prop="port" label="端口" width="80" />
-      <el-table-column prop="max_concurrent" label="最大并发" width="100" />
-      <el-table-column prop="max_tokens" label="最长Token" width="100" />
-      <el-table-column prop="api_key" label="API Key" width="100">
-        <template #default="{ row }">
-          <el-tag v-if="row.api_key" type="info">已配置</el-tag>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="description" label="描述" width="200" show-overflow-tooltip />
       <el-table-column prop="created_at" label="创建时间" width="180">
         <template #default="{ row }">
           {{ formatTime(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
+          <el-button size="small" @click="viewModel(row)">查看详情</el-button>
+          <el-button 
+            size="small" 
+            type="success"
+            @click="testModelConnection(row)"
+            :loading="testingModels[row.id]"
+          >
+            测试连接
+          </el-button>
           <el-button size="small" @click="editModel(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="deleteModel(row.id)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 模型详情对话框 -->
+    <el-dialog 
+      v-model="showDetailDialog" 
+      title="模型详情" 
+      width="800px"
+    >
+      <div v-if="currentModel">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="模型名称">{{ currentModel.name }}</el-descriptions-item>
+          <el-descriptions-item label="模型类型">
+            <el-tag>{{ getModelTypeLabel(currentModel.model_type) }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="模型标识">
+            {{ currentModel.model_name || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="API URL" :span="2">
+            <span style="word-break: break-all;">{{ currentModel.base_url || '-' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="API Key">
+            <el-tag v-if="currentModel.api_key" type="info">已配置</el-tag>
+            <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="最大并发数">
+            {{ currentModel.max_concurrent || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="最长Token">
+            {{ currentModel.max_tokens || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="创建时间">
+            {{ formatTime(currentModel.created_at) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="更新时间">
+            {{ formatTime(currentModel.updated_at) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="描述" :span="2">
+            {{ currentModel.description || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="其他配置" :span="2">
+            <pre v-if="currentModel.other_config && Object.keys(currentModel.other_config).length > 0" style="margin: 0; background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">
+{{ JSON.stringify(currentModel.other_config, null, 2) }}
+            </pre>
+            <span v-else>-</span>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <template #footer>
+        <el-button @click="showDetailDialog = false">关闭</el-button>
+        <el-button type="primary" @click="handleEditFromDetail">编辑</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 创建/编辑模型对话框 -->
     <el-dialog 
@@ -77,12 +125,30 @@
           />
           <div class="form-tip">模型的具体名称或标识符{{ needsModelName ? '（必需）' : '（可选）' }}</div>
         </el-form-item>
-        <el-form-item label="Base URL" prop="base_url">
-          <el-input 
-            v-model="modelForm.base_url" 
-            placeholder="例如: https://api.example.com/v1 或 https://api.example.com/v1/chat/completions"
+        <el-form-item label="API URL">
+          <div style="display: flex; gap: 10px;">
+            <el-input 
+              v-model="apiUrl" 
+              placeholder="例如: http://localhost:11434/v1 或 https://api.example.com/v1"
+            />
+            <el-button 
+              @click="testConnection" 
+              :loading="testingConnection"
+              type="primary"
+            >
+              测试连接
+            </el-button>
+          </div>
+          <div class="form-tip">完整的 API 服务地址，包含协议、主机和端口{{ needsBaseUrl ? '（必需）' : '（可选）' }}</div>
+          <el-alert
+            v-if="testResult"
+            :title="testResult.message"
+            :type="testResult.success ? 'success' : 'error'"
+            :description="testResult.details"
+            :closable="true"
+            @close="testResult = null"
+            style="margin-top: 10px;"
           />
-          <div class="form-tip">API 服务的基础 URL{{ needsBaseUrl ? '（必需）' : '（可选）' }}</div>
         </el-form-item>
         <el-form-item label="API Key" prop="api_key">
           <el-input 
@@ -92,16 +158,6 @@
             placeholder="输入 API Key（可选）"
           />
           <div class="form-tip">API 密钥，如果需要认证</div>
-        </el-form-item>
-        <el-form-item label="端口号" prop="port">
-          <el-input-number 
-            v-model="modelForm.port" 
-            :min="1" 
-            :max="65535"
-            placeholder="端口号"
-            style="width: 100%"
-          />
-          <div class="form-tip">本地服务的端口号（可选）</div>
         </el-form-item>
         <el-form-item label="最大并发数" prop="max_concurrent">
           <el-input-number 
@@ -151,9 +207,15 @@ const models = ref([])
 const modelTypes = ref([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
+const showDetailDialog = ref(false)
 const editingModel = ref(null)
+const currentModel = ref(null)
 const modelFormRef = ref(null)
 const otherConfigStr = ref('{}')
+const apiUrl = ref('')  // 合并的 URL 字段
+const testingConnection = ref(false)
+const testResult = ref(null)
+const testingModels = ref({})  // 跟踪每个模型的测试状态
 
 const modelForm = ref({
   name: '',
@@ -161,7 +223,6 @@ const modelForm = ref({
   description: '',
   base_url: '',
   api_key: '',
-  port: null,
   max_concurrent: null,
   max_tokens: null,
   model_name: '',
@@ -224,6 +285,12 @@ const loadModelTypes = async () => {
   }
 }
 
+const handleAddModel = () => {
+  editingModel.value = null
+  resetForm()
+  showCreateDialog.value = true
+}
+
 const handleModelTypeChange = () => {
   // 根据模型类型提供默认值提示，但不强制清空字段
   // 用户可以保留之前的值或手动修改
@@ -235,6 +302,19 @@ const editModel = (model) => {
   // 如果 api_key 是隐藏值，清空让用户重新输入
   if (modelForm.value.api_key === '***') {
     modelForm.value.api_key = ''
+  }
+  // 直接使用 base_url（如果旧数据有 port，需要合并）
+  if (model.port && model.base_url && !model.base_url.includes(':' + model.port)) {
+    // 兼容旧数据：如果有单独的 port，合并到 URL 中
+    try {
+      const urlObj = new URL(model.base_url)
+      urlObj.port = String(model.port)
+      apiUrl.value = urlObj.toString()
+    } catch (e) {
+      apiUrl.value = model.base_url
+    }
+  } else {
+    apiUrl.value = model.base_url || ''
   }
   otherConfigStr.value = JSON.stringify(model.other_config || {}, null, 2)
   showCreateDialog.value = true
@@ -253,13 +333,14 @@ const resetForm = () => {
     description: '',
     base_url: '',
     api_key: '',
-    port: null,
     max_concurrent: null,
     max_tokens: null,
     model_name: '',
     other_config: {}
   }
+  apiUrl.value = ''
   otherConfigStr.value = '{}'
+  testResult.value = null
   if (modelFormRef.value) {
     modelFormRef.value.resetFields()
   }
@@ -270,6 +351,15 @@ const saveModel = async () => {
   
   try {
     await modelFormRef.value.validate()
+    
+    // 验证 API URL（如果需要）
+    if (needsBaseUrl.value && (!apiUrl.value || !apiUrl.value.trim())) {
+      ElMessage.error('该模型类型需要提供 API URL')
+      return
+    }
+    
+    // 直接使用完整的 URL 作为 base_url
+    modelForm.value.base_url = apiUrl.value.trim() || ''
     
     // 解析其他配置
     try {
@@ -283,11 +373,27 @@ const saveModel = async () => {
       return
     }
     
+    // 清理数据，移除空字符串和 null 值（但保留 0 和 false）
+    const cleanData = { ...modelForm.value }
+    Object.keys(cleanData).forEach(key => {
+      if (cleanData[key] === '' || cleanData[key] === null) {
+        delete cleanData[key]
+      }
+    })
+    
+    // 确保必需字段存在
+    if (!cleanData.name || !cleanData.model_type) {
+      ElMessage.error('模型名称和模型类型是必需的')
+      return
+    }
+    
+    console.log('准备保存模型数据:', cleanData)
+    
     if (editingModel.value) {
-      await modelsApi.updateModel(editingModel.value.id, modelForm.value)
+      await modelsApi.updateModel(editingModel.value.id, cleanData)
       ElMessage.success('模型更新成功')
     } else {
-      await modelsApi.createModel(modelForm.value)
+      await modelsApi.createModel(cleanData)
       ElMessage.success('模型创建成功')
     }
     
@@ -297,7 +403,78 @@ const saveModel = async () => {
     loadModels()
   } catch (error) {
     if (error !== false) { // 验证失败时 error 为 false
-      ElMessage.error('保存模型失败: ' + error.message)
+      // 改进错误信息显示
+      console.error('保存模型失败，完整错误信息:', error)
+      console.error('错误类型:', typeof error)
+      console.error('错误对象:', JSON.stringify(error, null, 2))
+      
+      let errorMessage = '保存模型失败'
+      if (error) {
+        if (error instanceof Error) {
+          const msg = error.message || '未知错误'
+          errorMessage += ': ' + msg
+          console.error('Error.message:', msg)
+        } else if (typeof error === 'string') {
+          errorMessage += ': ' + error
+        } else if (error.message) {
+          errorMessage += ': ' + error.message
+          console.error('error.message:', error.message)
+        } else if (error.detail) {
+          // 处理 FastAPI 验证错误
+          if (Array.isArray(error.detail)) {
+            const details = error.detail.map(err => {
+              if (typeof err === 'object') {
+                if (err.loc && err.msg) {
+                  return `${err.loc.join('.')}: ${err.msg}`
+                } else if (err.field) {
+                  return `字段 ${err.field} 验证失败`
+                }
+              }
+              return String(err)
+            }).join(', ')
+            errorMessage += ': ' + details
+          } else if (typeof error.detail === 'string') {
+            errorMessage += ': ' + error.detail
+          } else if (typeof error.detail === 'object') {
+            // 处理对象格式的错误
+            const detailKeys = Object.keys(error.detail)
+            const detailMessages = detailKeys.map(key => {
+              const value = error.detail[key]
+              if (Array.isArray(value)) {
+                return `${key}: ${value.map(v => typeof v === 'object' ? (v.msg || JSON.stringify(v)) : v).join(', ')}`
+              }
+              return `${key}: ${value}`
+            }).join('; ')
+            errorMessage += ': ' + detailMessages
+          } else {
+            errorMessage += ': ' + JSON.stringify(error.detail)
+          }
+          console.error('error.detail:', error.detail)
+        } else if (error.response && error.response.data) {
+          const data = error.response.data
+          if (data.detail) {
+            if (Array.isArray(data.detail)) {
+              const details = data.detail.map(err => {
+                if (typeof err === 'object' && err.loc && err.msg) {
+                  return `${err.loc.join('.')}: ${err.msg}`
+                }
+                return String(err)
+              }).join(', ')
+              errorMessage += ': ' + details
+            } else {
+              errorMessage += ': ' + (data.detail || data.message || '未知错误')
+            }
+          } else {
+            errorMessage += ': ' + (data.message || '未知错误')
+          }
+          console.error('error.response.data:', data)
+        } else {
+          errorMessage += ': 未知错误，请查看控制台获取详细信息'
+        }
+      } else {
+        errorMessage += ': 未知错误'
+      }
+      ElMessage.error(errorMessage)
     }
   }
 }
@@ -312,7 +489,23 @@ const deleteModel = async (modelId) => {
     loadModels()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除模型失败: ' + error.message)
+      // 改进错误信息显示
+      let errorMessage = '删除模型失败'
+      if (error) {
+        if (error instanceof Error) {
+          errorMessage += ': ' + error.message
+        } else if (typeof error === 'string') {
+          errorMessage += ': ' + error
+        } else if (error.message) {
+          errorMessage += ': ' + error.message
+        } else if (error.detail) {
+          errorMessage += ': ' + error.detail
+        } else {
+          errorMessage += ': 未知错误'
+        }
+      }
+      ElMessage.error(errorMessage)
+      console.error('删除模型失败:', error)
     }
   }
 }
@@ -320,6 +513,139 @@ const deleteModel = async (modelId) => {
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
   return new Date(timeStr).toLocaleString('zh-CN')
+}
+
+const viewModel = async (model) => {
+  try {
+    // 获取完整的模型信息（包括可能被隐藏的字段）
+    const fullModel = await modelsApi.getModel(model.id)
+    currentModel.value = fullModel
+    showDetailDialog.value = true
+  } catch (error) {
+    ElMessage.error('获取模型详情失败: ' + error.message)
+  }
+}
+
+const handleEditFromDetail = () => {
+  if (currentModel.value) {
+    editModel(currentModel.value)
+    showDetailDialog.value = false
+  }
+}
+
+const testModelConnection = async (model) => {
+  if (!model.base_url) {
+    ElMessage.warning('该模型未配置 API URL，无法测试连接')
+    return
+  }
+  
+  if (!model.model_type) {
+    ElMessage.warning('该模型未配置模型类型，无法测试连接')
+    return
+  }
+  
+  // 检查是否需要模型标识
+  const type = modelTypes.value.find(t => t.value === model.model_type)
+  const requiresModelName = type && type.requires && type.requires.includes('model_name')
+  
+  if (requiresModelName && !model.model_name) {
+    ElMessage.warning('该模型类型需要提供模型标识才能进行测试')
+    return
+  }
+  
+  testingModels.value[model.id] = true
+  
+  try {
+    const testData = {
+      model_type: model.model_type,
+      base_url: model.base_url,
+      api_key: model.api_key === '***' ? undefined : model.api_key,  // 如果是隐藏值，不发送
+      model_name: model.model_name || undefined
+    }
+    
+    const result = await modelsApi.testConnection(testData)
+    
+    if (result.success) {
+      ElMessage.success(`模型 "${model.name}" 连接测试成功: ${result.message}`)
+    } else {
+      ElMessage.error(`模型 "${model.name}" 连接测试失败: ${result.message}`)
+    }
+  } catch (error) {
+    let errorMessage = '连接测试失败'
+    if (error) {
+      if (error instanceof Error) {
+        errorMessage += ': ' + (error.message || '未知错误')
+      } else if (typeof error === 'string') {
+        errorMessage += ': ' + error
+      } else if (error.message) {
+        errorMessage += ': ' + error.message
+      } else if (error.detail) {
+        if (typeof error.detail === 'string') {
+          errorMessage += ': ' + error.detail
+        } else {
+          errorMessage += ': ' + JSON.stringify(error.detail)
+        }
+      } else {
+        errorMessage += ': 未知错误'
+      }
+    }
+    ElMessage.error(`模型 "${model.name}" ${errorMessage}`)
+    console.error('测试模型连接失败:', error)
+  } finally {
+    testingModels.value[model.id] = false
+  }
+}
+
+const testConnection = async () => {
+  if (!apiUrl.value || !apiUrl.value.trim()) {
+    ElMessage.warning('请先输入 API URL')
+    return
+  }
+  
+  if (!modelForm.value.model_type) {
+    ElMessage.warning('请先选择模型类型')
+    return
+  }
+  
+  // 检查是否需要模型标识
+  const type = modelTypes.value.find(t => t.value === modelForm.value.model_type)
+  const requiresModelName = type && type.requires && type.requires.includes('model_name')
+  
+  if (requiresModelName && !modelForm.value.model_name) {
+    ElMessage.warning('该模型类型需要提供模型标识才能进行测试')
+    return
+  }
+  
+  testingConnection.value = true
+  testResult.value = null
+  
+  try {
+    // 结合模型类型和模型标识进行测试
+    const testData = {
+      model_type: modelForm.value.model_type,
+      base_url: apiUrl.value.trim(),
+      api_key: modelForm.value.api_key || undefined,
+      model_name: modelForm.value.model_name || undefined
+    }
+    
+    const result = await modelsApi.testConnection(testData)
+    testResult.value = result
+    
+    if (result.success) {
+      ElMessage.success('连接测试成功')
+    } else {
+      ElMessage.error('连接测试失败: ' + result.message)
+    }
+  } catch (error) {
+    testResult.value = {
+      success: false,
+      message: '测试失败',
+      details: error.message || '未知错误'
+    }
+    ElMessage.error('连接测试失败: ' + error.message)
+  } finally {
+    testingConnection.value = false
+  }
 }
 
 onMounted(() => {

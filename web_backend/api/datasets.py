@@ -188,14 +188,60 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             dataset_name = config.get("dataset_name")
                             
                             # 检查是否已在列表中
-                            existing = any(
-                                d["path"] == dataset_path and d.get("config_name") == dataset_name
-                                for d in datasets
-                            )
+                            existing_index = None
+                            for idx, d in enumerate(datasets):
+                                if d["path"] == dataset_path and d.get("config_name") == dataset_name:
+                                    existing_index = idx
+                                    break
                             
-                            if not existing:
+                            if existing_index is not None:
+                                # 如果已存在，但缺少 splits 或 num_examples，尝试更新
+                                existing_dataset = datasets[existing_index]
+                                if not existing_dataset.get("splits") or not existing_dataset.get("num_examples"):
+                                    local_path = get_local_dataset_path(dataset_path, dataset_name)
+                                    if local_path.exists():
+                                        try:
+                                            dataset = load_from_disk(str(local_path))
+                                            splits = list(dataset.keys())
+                                            num_examples = {split: len(dataset[split]) for split in splits}
+                                            existing_dataset["splits"] = splits
+                                            existing_dataset["num_examples"] = num_examples
+                                            existing_dataset["is_local"] = True
+                                            existing_dataset["local_path"] = str(local_path)
+                                        except Exception:
+                                            pass
+                            elif not existing_index:
                                 local_path = get_local_dataset_path(dataset_path, dataset_name)
                                 is_local = local_path.exists()
+                                
+                                # 如果数据集在本地，尝试加载获取 splits 和 num_examples
+                                splits = None
+                                num_examples = None
+                                if is_local:
+                                    try:
+                                        dataset = load_from_disk(str(local_path))
+                                        splits = list(dataset.keys())
+                                        num_examples = {split: len(dataset[split]) for split in splits}
+                                    except Exception:
+                                        # 如果加载失败，尝试其他可能的路径格式
+                                        # 例如：task_name 可能是 super_glue_boolq，但目录可能是 super_glue/boolq
+                                        try:
+                                            # 尝试将 task_name 中的下划线转换为路径
+                                            task_name_parts = task_name.split("_")
+                                            for i in range(len(task_name_parts) - 1, 0, -1):
+                                                possible_path = "_".join(task_name_parts[:i])
+                                                possible_config = "_".join(task_name_parts[i:])
+                                                possible_local_path = get_local_dataset_path(possible_path, possible_config)
+                                                if possible_local_path.exists():
+                                                    dataset = load_from_disk(str(possible_local_path))
+                                                    splits = list(dataset.keys())
+                                                    num_examples = {split: len(dataset[split]) for split in splits}
+                                                    local_path = possible_local_path
+                                                    is_local = True
+                                                    break
+                                        except Exception:
+                                            # 如果所有尝试都失败，保持为 None
+                                            pass
                                 
                                 # 获取标签
                                 tags = []
@@ -213,8 +259,8 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     "description": f"Task: {task_name}",
                                     "local_path": str(local_path) if is_local else None,
                                     "is_local": is_local,
-                                    "splits": None,
-                                    "num_examples": None,
+                                    "splits": splits,
+                                    "num_examples": num_examples,
                                     "category": infer_category(dataset_path, task_name, tags),
                                     "tags": tags
                                 })
@@ -283,10 +329,263 @@ async def refresh_cache():
     return {"message": "缓存已刷新"}
 
 
+@router.get("/samples")
+async def get_dataset_samples(dataset_name: str = Query(..., description="数据集名称"), split: str = Query("train"), limit: int = Query(2)):
+    """获取数据集样本（带缓存）"""
+    # URL 解码数据集名称（处理可能的编码问题）
+    import urllib.parse
+    dataset_name = urllib.parse.unquote(dataset_name)
+    
+    cache_key = f"{dataset_name}:{split}"
+    
+    # 检查缓存
+    with _samples_cache_lock:
+        if cache_key in _samples_cache and len(_samples_cache[cache_key]) >= limit:
+            return _samples_cache[cache_key][:limit]
+    
+    # 从缓存的数据集列表中查找数据集信息
+    all_datasets = load_all_datasets()
+    dataset_info = None
+    
+    # 调试：打印所有数据集名称
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"查找数据集: {dataset_name}")
+    logger.info(f"可用数据集名称: {[d.get('name') for d in all_datasets[:10]]}")
+    
+    # 首先尝试精确匹配 name
+    for d in all_datasets:
+        if d.get("name") == dataset_name:
+            dataset_info = d
+            logger.info(f"精确匹配成功: {dataset_name} -> {d.get('name')}")
+            break
+    
+    # 如果找不到，尝试多种匹配方式
+    if not dataset_info:
+        # 将数据集名称中的斜杠转换为下划线，用于匹配目录名格式
+        dataset_name_normalized = dataset_name.replace("/", "_")
+        # 也尝试将下划线转换为斜杠
+        dataset_name_with_slash = dataset_name.replace("_", "/")
+        
+        logger.info(f"尝试模糊匹配: {dataset_name} -> {dataset_name_normalized} 或 {dataset_name_with_slash}")
+        
+        # 尝试解析数据集名称，可能是 path/config_name 格式
+        # 例如: EleutherAI/hendrycks/math_intermediate_algebra
+        # 可能是: path = EleutherAI/hendrycks/math, config_name = intermediate_algebra
+        # 或者: path = EleutherAI/hendrycks_math, config_name = intermediate_algebra
+        dataset_parts = dataset_name.split("/")
+        possible_paths = []
+        if len(dataset_parts) > 1:
+            # 尝试不同的路径组合
+            # 例如: EleutherAI/hendrycks/math_intermediate_algebra
+            # 可能是: EleutherAI/hendrycks/math + intermediate_algebra
+            # 或者: EleutherAI/hendrycks_math + intermediate_algebra
+            last_part = dataset_parts[-1]
+            if "_" in last_part:
+                # 最后一部分可能包含 config_name
+                parts = last_part.split("_", 1)
+                if len(parts) == 2:
+                    possible_paths.append(("/".join(dataset_parts[:-1]) + "/" + parts[0], parts[1]))
+                    possible_paths.append(("/".join(dataset_parts[:-1]) + "_" + parts[0], parts[1]))
+        
+        for d in all_datasets:
+            path = d.get("path", "")
+            config_name = d.get("config_name")
+            name = d.get("name", "")
+            
+            # 尝试匹配 path_config_name 格式
+            if config_name:
+                expected_name = f"{path}_{config_name}"
+                # 也尝试路径中的斜杠替换为下划线的格式
+                path_normalized = path.replace("/", "_")
+                expected_name_normalized = f"{path_normalized}_{config_name}"
+            else:
+                expected_name = path
+                path_normalized = path.replace("/", "_")
+                expected_name_normalized = path_normalized
+            
+            # 多种匹配方式：支持斜杠和下划线的互相转换
+            matches = (
+                expected_name == dataset_name or 
+                expected_name_normalized == dataset_name or
+                expected_name_normalized == dataset_name_normalized or
+                expected_name == dataset_name_normalized or
+                expected_name == dataset_name_with_slash or
+                path == dataset_name or
+                path == dataset_name_normalized or
+                path == dataset_name_with_slash or
+                path_normalized == dataset_name or
+                path_normalized == dataset_name_normalized or
+                name == dataset_name or
+                name == dataset_name_normalized or
+                name == dataset_name_with_slash or
+                name.replace("/", "_") == dataset_name_normalized or
+                name.replace("_", "/") == dataset_name or
+                name.replace("_", "/") == dataset_name_with_slash
+            )
+            
+            # 检查可能的路径组合
+            if not matches and possible_paths:
+                for possible_path, possible_config in possible_paths:
+                    if path == possible_path and config_name == possible_config:
+                        matches = True
+                        break
+                    path_norm = possible_path.replace("/", "_")
+                    if path_normalized == path_norm and config_name == possible_config:
+                        matches = True
+                        break
+            
+            # 最后尝试：直接比较路径的各个部分（忽略分隔符）
+            if not matches:
+                # 将路径和名称都标准化（统一使用下划线）
+                dataset_name_std = dataset_name.replace("/", "_").replace("-", "_")
+                path_std = path.replace("/", "_").replace("-", "_")
+                name_std = name.replace("/", "_").replace("-", "_")
+                
+                # 如果标准化后的名称或路径完全匹配
+                if (dataset_name_std == path_std or 
+                    dataset_name_std == name_std or
+                    (config_name and dataset_name_std == f"{path_std}_{config_name}")):
+                    matches = True
+            
+            if matches:
+                dataset_info = d
+                logger.info(f"模糊匹配成功: {dataset_name} -> {name} (path: {path}, config: {config_name})")
+                break
+    
+    if not dataset_info:
+        # 提供更详细的错误信息，列出所有可用的数据集名称
+        available_names = [d.get("name", "unknown") for d in all_datasets[:20]]  # 显示前20个
+        # 也显示路径信息以便调试
+        available_info = [
+            f"{d.get('name', 'unknown')} (path: {d.get('path', 'unknown')}, config: {d.get('config_name', 'None')})"
+            for d in all_datasets[:20]
+        ]
+        # 尝试查找包含相似路径的数据集
+        similar_datasets = [
+            d for d in all_datasets 
+            if (dataset_name.replace("/", "_") in d.get("name", "") or 
+                dataset_name.replace("_", "/") in d.get("name", "") or
+                dataset_name in d.get("path", "") or
+                dataset_name.replace("/", "_") in d.get("path", ""))
+        ]
+        similar_info = [
+            f"{d.get('name', 'unknown')} (path: {d.get('path', 'unknown')})"
+            for d in similar_datasets[:10]
+        ]
+        
+        error_msg = f"数据集不存在: {dataset_name}"
+        if similar_info:
+            error_msg += f"。相似数据集: {'; '.join(similar_info)}"
+        error_msg += f"。可用数据集（前10个）: {', '.join(available_names[:10])}"
+        
+        logger.error(f"数据集查找失败: {dataset_name}")
+        logger.error(f"所有可用数据集: {available_info[:10]}")
+        
+        raise HTTPException(
+            status_code=404, 
+            detail=error_msg
+        )
+    
+    # 检查是否有本地路径
+    local_path = dataset_info.get("local_path")
+    if not local_path:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"数据集 '{dataset_name}' 没有本地路径，无法加载样本。请先下载数据集。"
+        )
+    
+    # 检查本地路径是否存在
+    from pathlib import Path
+    local_path_obj = Path(local_path)
+    if not local_path_obj.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"数据集本地路径不存在: {local_path}"
+        )
+    
+    # 从本地加载数据集
+    # load_from_disk 可以正确读取 Arrow 格式的数据集（data-00000-of-00001.arrow 等文件）
+    try:
+        # 确保路径是字符串格式
+        dataset_path_str = str(local_path)
+        
+        # 使用 load_from_disk 加载数据集
+        # 这会自动读取目录下的所有 splits（test/, train/, validation/ 等）
+        # 以及对应的 Arrow 文件（data-00000-of-00001.arrow 等）
+        dataset = load_from_disk(dataset_path_str)
+        
+        # 验证数据集是否成功加载
+        if not dataset or not isinstance(dataset, dict):
+            raise ValueError(f"数据集加载失败：返回的数据不是字典格式")
+            
+    except Exception as e:
+        import traceback
+        error_detail = f"加载本地数据集失败: {str(e)}。路径: {local_path}"
+        # 在开发环境中，可以包含更详细的错误信息
+        if os.environ.get("DEBUG", "").lower() == "true":
+            error_detail += f"\n详细错误: {traceback.format_exc()}"
+        raise HTTPException(
+            status_code=500, 
+            detail=error_detail
+        )
+    
+    # 检查 split 是否存在
+    if split not in dataset:
+        available_splits = list(dataset.keys())
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Split '{split}' 不存在。可用 splits: {', '.join(available_splits)}"
+        )
+    
+    # 获取样本
+    # dataset[split] 返回的是 Dataset 对象，可以通过切片获取样本
+    try:
+        split_dataset = dataset[split]
+        
+        # 获取指定数量的样本
+        # 使用 [:limit] 切片，这会返回 Dataset 对象的前 limit 条记录
+        samples = split_dataset[:limit]
+        
+        # 转换为字典列表
+        # 如果 samples 是字典（单个样本），转换为列表
+        if isinstance(samples, dict):
+            sample_list = [samples]
+        else:
+            # samples 是 Dataset 对象，转换为字典列表
+            sample_list = [dict(sample) for sample in samples]
+            
+    except Exception as e:
+        import traceback
+        error_detail = f"读取样本失败: {str(e)}"
+        if os.environ.get("DEBUG", "").lower() == "true":
+            error_detail += f"\n详细错误: {traceback.format_exc()}"
+        raise HTTPException(
+            status_code=500,
+            detail=error_detail
+        )
+    
+    # 更新缓存
+    with _samples_cache_lock:
+        _samples_cache[cache_key] = sample_list
+    
+    return sample_list
+
+
 @router.get("/{dataset_name}", response_model=DatasetResponse)
 async def get_dataset(dataset_name: str):
     """获取单个数据集详情"""
-    # 首先尝试从本地查找
+    # 如果 dataset_name 包含 '/'，说明可能是路由匹配错误，应该匹配到更具体的路由
+    if '/' in dataset_name:
+        raise HTTPException(status_code=404, detail="数据集不存在")
+    
+    # 首先从缓存的数据集列表中查找（确保返回的 name 与列表中的一致）
+    all_datasets = load_all_datasets()
+    for dataset_info in all_datasets:
+        if dataset_info["name"] == dataset_name:
+            return DatasetResponse(**dataset_info)
+    
+    # 如果没找到，尝试从本地查找（兼容旧代码）
     for dataset_dir in DATA_DIR.iterdir():
         if dataset_dir.is_dir():
             if dataset_dir.name == dataset_name.replace("/", "_"):
@@ -405,42 +704,4 @@ async def delete_dataset(dataset_name: str):
         return {"message": "数据集已删除"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
-
-
-@router.get("/{dataset_name}/samples")
-async def get_dataset_samples(dataset_name: str, split: str = "train", limit: int = 10):
-    """获取数据集样本（带缓存）"""
-    cache_key = f"{dataset_name}:{split}"
-    
-    # 检查缓存
-    with _samples_cache_lock:
-        if cache_key in _samples_cache and len(_samples_cache[cache_key]) >= limit:
-            return _samples_cache[cache_key][:limit]
-    
-    # 加载数据集
-    dataset_path = DATA_DIR / dataset_name.replace("/", "_")
-    
-    if dataset_path.exists():
-        # 从本地加载
-        dataset = load_from_disk(str(dataset_path))
-    else:
-        # 从 HuggingFace 加载
-        try:
-            dataset = load_dataset(dataset_name, trust_remote_code=True)
-        except Exception:
-            raise HTTPException(status_code=404, detail="数据集不存在")
-    
-    if split not in dataset:
-        raise HTTPException(status_code=404, detail=f"Split '{split}' 不存在")
-    
-    samples = dataset[split][:limit]
-    
-    # 转换为字典列表
-    sample_list = [dict(sample) for sample in samples]
-    
-    # 更新缓存
-    with _samples_cache_lock:
-        _samples_cache[cache_key] = sample_list
-    
-    return sample_list
 

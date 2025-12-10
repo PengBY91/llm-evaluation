@@ -3,9 +3,11 @@
 使用 FastAPI 框架
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 import uvicorn
 
 from api import tasks, datasets, models
@@ -15,6 +17,18 @@ app = FastAPI(
     description="基于 lm-evaluation-harness 的评测任务管理平台 API",
     version="1.0.0"
 )
+
+# 添加全局异常处理器
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """处理 Pydantic 验证错误"""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "detail": exc.errors(),
+            "message": "请求数据验证失败: " + ", ".join([f"{err['loc']}: {err['msg']}" for err in exc.errors()])
+        }
+    )
 
 # 配置 CORS
 app.add_middleware(

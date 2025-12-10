@@ -8,6 +8,8 @@ ENV/
 env/
 *.env
 
+models/
+
 
 web_frontend/node_modules/
 

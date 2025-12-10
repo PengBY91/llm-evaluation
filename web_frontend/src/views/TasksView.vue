@@ -2,7 +2,11 @@
   <div class="tasks-view">
     <div class="view-header">
       <h2>评测任务管理</h2>
-      <el-button type="primary" @click="showCreateDialog = true">
+      <el-button 
+        type="primary" 
+        @click="handleCreateTaskClick"
+        :loading="loadingAvailableTasks"
+      >
         <el-icon><Plus /></el-icon>
         新建任务
       </el-button>
@@ -43,6 +47,22 @@
           </el-button>
           <el-button 
             size="small" 
+            type="primary" 
+            @click="startTask(row.id)"
+            :disabled="row.status === 'running' || row.status === 'pending'"
+          >
+            启动
+          </el-button>
+          <el-button 
+            size="small" 
+            type="warning" 
+            @click="stopTask(row.id)"
+            :disabled="row.status !== 'running'"
+          >
+            终止
+          </el-button>
+          <el-button 
+            size="small" 
             type="danger" 
             @click="deleteTask(row.id)"
             :disabled="row.status === 'running'"
@@ -54,7 +74,13 @@
     </el-table>
 
     <!-- 创建任务对话框 -->
-    <el-dialog v-model="showCreateDialog" title="新建评测任务" width="800px">
+    <el-dialog 
+      v-model="showCreateDialog" 
+      title="新建评测任务" 
+      width="800px"
+      :close-on-click-modal="false"
+      @opened="handleDialogOpened"
+    >
       <el-form :model="taskForm" label-width="120px">
         <el-form-item label="任务名称" required>
           <el-input v-model="taskForm.name" placeholder="请输入任务名称" />
@@ -79,8 +105,12 @@
           <el-select 
             v-model="taskForm.tasks" 
             multiple 
-            placeholder="请选择评测任务"
+            placeholder="请选择评测任务（点击下拉框加载 /data 目录下的数据集）"
             style="width: 100%"
+            :loading="loadingAvailableTasks"
+            filterable
+            @visible-change="handleTaskSelectVisible"
+            @focus="handleTaskSelectFocus"
           >
             <el-option 
               v-for="task in availableTasks" 
@@ -89,6 +119,12 @@
               :value="task" 
             />
           </el-select>
+          <div v-if="loadingAvailableTasks" style="font-size: 12px; color: #999; margin-top: 5px;">
+            正在从 /data 目录加载数据集...
+          </div>
+          <div v-else-if="availableTasks.length === 0" style="font-size: 12px; color: #999; margin-top: 5px;">
+            点击下拉框加载 /data 目录下的数据集
+          </div>
         </el-form-item>
         <el-form-item label="Few-shot数量">
           <el-input-number v-model="taskForm.num_fewshot" :min="0" />
@@ -182,6 +218,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { tasksApi } from '../api/tasks'
 import { modelsApi } from '../api/models'
+import { datasetsApi } from '../api/datasets'
 
 const tasks = ref([])
 const models = ref([])
@@ -191,6 +228,7 @@ const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentTask = ref(null)
 const modelArgsStr = ref('{}')
+const loadingAvailableTasks = ref(false)
 
 const selectedModelId = ref(null)
 
@@ -239,6 +277,29 @@ const getModelTypeLabel = (type) => {
   return typeMap[type] || type
 }
 
+const handleCreateTaskClick = () => {
+  // 重置表单
+  selectedModelId.value = null
+  taskForm.value = {
+    name: '',
+    model: 'openai-chat-completions',
+    model_args: {},
+    tasks: [],
+    num_fewshot: null,
+    batch_size: null,
+    device: null,
+    limit: null,
+    log_samples: true,
+    apply_chat_template: false,
+    gen_kwargs: null,
+    config_id: null
+  }
+  modelArgsStr.value = '{}'
+  
+  // 打开对话框
+  showCreateDialog.value = true
+}
+
 const handleModelSelect = async (modelId) => {
   if (!modelId) {
     return
@@ -255,7 +316,29 @@ const handleModelSelect = async (modelId) => {
       taskForm.value.apply_chat_template = true
     }
   } catch (error) {
-    ElMessage.error('加载模型配置失败: ' + error.message)
+    console.error('加载模型配置失败:', error)
+    let errorMessage = '加载模型配置失败'
+    if (error) {
+      if (error instanceof Error) {
+        errorMessage += ': ' + (error.message || '未知错误')
+      } else if (typeof error === 'string') {
+        errorMessage += ': ' + error
+      } else if (error.message) {
+        errorMessage += ': ' + error.message
+      } else if (error.detail) {
+        if (typeof error.detail === 'string') {
+          errorMessage += ': ' + error.detail
+        } else {
+          errorMessage += ': ' + JSON.stringify(error.detail)
+        }
+      } else if (error.response && error.response.data) {
+        const data = error.response.data
+        errorMessage += ': ' + (data.detail || data.message || '未知错误')
+      } else {
+        errorMessage += ': 未知错误'
+      }
+    }
+    ElMessage.error(errorMessage)
   }
 }
 
@@ -335,6 +418,26 @@ const downloadResults = async (taskId) => {
   }
 }
 
+const startTask = async (taskId) => {
+  try {
+    await tasksApi.startTask(taskId)
+    ElMessage.success('任务已启动')
+    loadTasks()
+  } catch (error) {
+    ElMessage.error('启动任务失败: ' + error.message)
+  }
+}
+
+const stopTask = async (taskId) => {
+  try {
+    await tasksApi.stopTask(taskId)
+    ElMessage.success('任务已终止')
+    loadTasks()
+  } catch (error) {
+    ElMessage.error('终止任务失败: ' + error.message)
+  }
+}
+
 const getStatusType = (status) => {
   const map = {
     pending: 'info',
@@ -361,20 +464,100 @@ const formatTime = (timeStr) => {
 }
 
 const loadAvailableTasks = async () => {
+  // 如果已经加载过，直接返回
+  if (availableTasks.value.length > 0) {
+    return
+  }
+  
+  loadingAvailableTasks.value = true
   try {
-    const data = await tasksApi.getAvailableTasks()
-    availableTasks.value = data.subtasks || []
+    // 从 datasets API 获取 /data 目录下的本地数据集
+    const response = await datasetsApi.getDatasets({
+      is_local: true,  // 只获取本地数据集
+      page: 1,
+      page_size: 1000  // 获取所有本地数据集
+    })
+    
+    // 检查响应数据结构
+    if (!response || !response.datasets) {
+      console.warn('数据集 API 返回数据格式异常:', response)
+      availableTasks.value = []
+      ElMessage.warning('/data 目录下没有找到数据集')
+      return
+    }
+    
+    // 将数据集转换为任务名称
+    // 根据 lm-evaluation-harness 的命名规则：
+    // - 如果有 config_name: "{dataset_path}_{config_name}"，路径中的 "/" 替换为 "_"
+    // - 如果没有 config_name: "{dataset_path}"，路径中的 "/" 替换为 "_"
+    const taskNames = response.datasets
+      .filter(dataset => dataset && dataset.path)  // 过滤无效数据
+      .map(dataset => {
+        let taskName = dataset.path.replace(/\//g, '_')  // 将路径中的 "/" 替换为 "_"
+        if (dataset.config_name) {
+          taskName = `${taskName}_${dataset.config_name}`
+        }
+        return taskName
+      })
+    
+    // 去重并排序
+    availableTasks.value = [...new Set(taskNames)].sort()
+    
+    if (availableTasks.value.length === 0) {
+      ElMessage.warning('/data 目录下没有找到数据集，请先下载数据集')
+    }
   } catch (error) {
-    console.error('加载可用任务列表失败:', error)
-    // 使用默认任务列表
-    availableTasks.value = ['gsm8k', 'hellaswag', 'arc_easy', 'arc_challenge', 'mmlu']
+    console.error('加载数据集列表失败:', error)
+    // 改进错误信息显示
+    let errorMessage = '加载数据集列表失败'
+    if (error) {
+      if (error instanceof Error) {
+        errorMessage += ': ' + error.message
+      } else if (typeof error === 'string') {
+        errorMessage += ': ' + error
+      } else if (error.message) {
+        errorMessage += ': ' + error.message
+      } else if (error.detail) {
+        errorMessage += ': ' + error.detail
+      } else if (error.response && error.response.data) {
+        const data = error.response.data
+        errorMessage += ': ' + (data.detail || data.message || '未知错误')
+      } else {
+        errorMessage += ': 未知错误'
+      }
+    }
+    ElMessage.error(errorMessage)
+    availableTasks.value = []
+  } finally {
+    loadingAvailableTasks.value = false
+  }
+}
+
+const handleTaskSelectVisible = (visible) => {
+  // 当下拉框打开时，如果还没有加载数据，则加载
+  if (visible && availableTasks.value.length === 0 && !loadingAvailableTasks.value) {
+    loadAvailableTasks()
+  }
+}
+
+const handleTaskSelectFocus = () => {
+  // 当获得焦点时，如果还没有加载数据，则加载
+  if (availableTasks.value.length === 0 && !loadingAvailableTasks.value) {
+    loadAvailableTasks()
+  }
+}
+
+const handleDialogOpened = () => {
+  // 对话框打开时，只加载模型列表（如果需要），不加载任务列表
+  if (models.value.length === 0) {
+    loadModels()
   }
 }
 
 onMounted(() => {
   loadTasks()
   loadModels()
-  loadAvailableTasks()
+  // 不再在页面加载时加载任务列表，改为懒加载
 })
 </script>
 
