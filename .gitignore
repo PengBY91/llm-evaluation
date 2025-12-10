@@ -8,6 +8,9 @@ ENV/
 env/
 *.env
 
+
+web_frontend/node_modules/
+
 # Python bytecode and build artifacts
 __pycache__/
 *.py[cod]
