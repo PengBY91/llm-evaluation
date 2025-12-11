@@ -374,8 +374,14 @@ const saveModel = async () => {
     }
     
     // 清理数据，移除空字符串和 null 值（但保留 0 和 false）
+    // 注意：api_key 即使是空字符串也应该保留，以便清除已保存的 api_key
     const cleanData = { ...modelForm.value }
     Object.keys(cleanData).forEach(key => {
+      // api_key 特殊处理：空字符串表示清除，应该保留
+      if (key === 'api_key') {
+        // api_key 保留原值（包括空字符串），让后端处理
+        return
+      }
       if (cleanData[key] === '' || cleanData[key] === null) {
         delete cleanData[key]
       }
@@ -556,11 +562,13 @@ const testModelConnection = async (model) => {
   testingModels.value[model.id] = true
   
   try {
+    // 传递 model_id，后端会从数据库获取真实的 api_key
     const testData = {
       model_type: model.model_type,
       base_url: model.base_url,
-      api_key: model.api_key === '***' ? undefined : model.api_key,  // 如果是隐藏值，不发送
-      model_name: model.model_name || undefined
+      api_key: model.api_key === '***' ? undefined : model.api_key,  // 如果是隐藏值，传 undefined，让后端从数据库获取
+      model_name: model.model_name || undefined,
+      model_id: model.id  // 传递 model_id，后端会从数据库获取真实的 api_key
     }
     
     const result = await modelsApi.testConnection(testData)

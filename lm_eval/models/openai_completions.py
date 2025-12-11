@@ -249,8 +249,16 @@ class OpenAICompletionsAPI(LocalCompletionsAPI):
         self,
         base_url="https://api.openai.com/v1/completions",
         tokenizer_backend="tiktoken",
+        api_key=None,  # 支持从参数传入 api_key
         **kwargs,
     ):
+        # 保存 api_key 参数（如果提供）
+        # 如果 kwargs 中有 api_key，优先使用它（优先级更高）
+        if "api_key" in kwargs:
+            self._api_key = kwargs.pop("api_key")
+        else:
+            self._api_key = api_key
+        
         super().__init__(
             base_url=base_url, tokenizer_backend=tokenizer_backend, **kwargs
         )
@@ -258,10 +266,15 @@ class OpenAICompletionsAPI(LocalCompletionsAPI):
     @cached_property
     def api_key(self):
         """Override this property to return the API key for the API request."""
+        # 优先使用 __init__ 时传入的 api_key
+        if hasattr(self, "_api_key") and self._api_key:
+            return self._api_key
+        
+        # 其次从环境变量读取
         key = os.environ.get("OPENAI_API_KEY", None)
         if key is None:
             raise ValueError(
-                "API key not found. Please set the `OPENAI_API_KEY` environment variable."
+                "API key not found. Please set the `OPENAI_API_KEY` environment variable or pass `api_key` in model_args."
             )
         return key
 
@@ -285,12 +298,20 @@ class OpenAIChatCompletion(LocalChatCompletion):
         base_url="https://api.openai.com/v1/chat/completions",
         tokenizer_backend=None,
         tokenized_requests=False,
+        api_key=None,  # 支持从参数传入 api_key
         **kwargs,
     ):
         if "o1" in kwargs.get("model", ""):
             eval_logger.warning(
                 "o1 models do not support `stop` and only support temperature=1"
             )
+
+        # 保存 api_key 参数（如果提供）
+        # 如果 kwargs 中有 api_key，优先使用它（优先级更高）
+        if "api_key" in kwargs:
+            self._api_key = kwargs.pop("api_key")
+        else:
+            self._api_key = api_key
 
         super().__init__(
             base_url=base_url,
@@ -302,10 +323,15 @@ class OpenAIChatCompletion(LocalChatCompletion):
     @cached_property
     def api_key(self):
         """Override this property to return the API key for the API request."""
+        # 优先使用 __init__ 时传入的 api_key
+        if hasattr(self, "_api_key") and self._api_key:
+            return self._api_key
+        
+        # 其次从环境变量读取
         key = os.environ.get("OPENAI_API_KEY", None)
         if key is None:
             raise ValueError(
-                "API key not found. Please set the `OPENAI_API_KEY` environment variable."
+                "API key not found. Please set the `OPENAI_API_KEY` environment variable or pass `api_key` in model_args."
             )
         return key
 

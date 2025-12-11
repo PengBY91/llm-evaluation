@@ -611,6 +611,12 @@ def evaluate(
         for instances in instances_by_doc_id.values():
             instances.sort(key=lambda x: x.idx)
         # iterate over different filters used
+        # Check if task.instances is empty or if filtered_resps is empty
+        if not task.instances or not task.instances[0].filtered_resps:
+            eval_logger.warning(
+                f"Task {task_output.task_name} has no instances or no filtered_resps, skipping processing"
+            )
+            continue
         for filter_key in task.instances[0].filtered_resps:
             indices = (
                 samples.get(task_output.task_name, None)

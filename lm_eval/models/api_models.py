@@ -510,6 +510,7 @@ class TemplateAPI(TemplateLM):
         )
         cache_method = "generate_until" if generate else "loglikelihood"
         acquired = await sem.acquire()
+        outputs = None  # Initialize outputs to avoid UnboundLocalError
         try:
             async with session.post(
                 self.base_url,
@@ -542,7 +543,7 @@ class TemplateAPI(TemplateLM):
             return answers
         # If the retries also fail
         except BaseException as e:
-            eval_logger.error(f"Exception:{repr(e)}, {outputs}, retrying.")
+            eval_logger.error(f"Exception:{repr(e)}, outputs={outputs}, retrying.")
             raise e
         finally:
             if acquired:

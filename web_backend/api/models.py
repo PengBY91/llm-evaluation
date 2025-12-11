@@ -16,8 +16,39 @@ router = APIRouter()
 MODELS_DIR = Path(__file__).parent.parent.parent / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
-# 内存中的模型配置（实际应用中应使用数据库）
+# 内存中的模型配置（使用文件持久化）
 models_db: Dict[str, Dict[str, Any]] = {}
+
+
+def load_model_from_file(model_id: str) -> Optional[Dict[str, Any]]:
+    """从文件加载模型配置"""
+    model_file = MODELS_DIR / f"{model_id}.json"
+    if model_file.exists():
+        try:
+            with open(model_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"读取模型文件失败 {model_id}: {e}")
+            return None
+    return None
+
+
+def load_all_models_from_files():
+    """从文件加载所有模型"""
+    models = {}
+    for model_file in MODELS_DIR.glob("*.json"):
+        model_id = model_file.stem
+        try:
+            model_data = load_model_from_file(model_id)
+            if model_data:
+                models[model_id] = model_data
+        except Exception as e:
+            print(f"加载模型文件失败 {model_id}: {e}")
+    return models
+
+
+# 启动时加载所有模型
+models_db = load_all_models_from_files()
 
 
 class ModelCreateRequest(BaseModel):
@@ -54,6 +85,8 @@ class ModelUpdateRequest(BaseModel):
 
 class ModelResponse(BaseModel):
     """模型响应"""
+    model_config = {"protected_namespaces": ()}
+    
     id: str
     name: str
     model_type: str
@@ -77,15 +110,6 @@ def save_model_to_file(model_id: str, model_data: Dict[str, Any]):
         json.dump(model_data, f, ensure_ascii=False, indent=2)
 
 
-def load_model_from_file(model_id: str) -> Optional[Dict[str, Any]]:
-    """从文件加载模型配置"""
-    model_file = MODELS_DIR / f"{model_id}.json"
-    if model_file.exists():
-        with open(model_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return None
-
-
 def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
     """根据模型配置生成 model_args"""
     model_args = {}
@@ -93,10 +117,11 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
     if model.get("model_name"):
         model_args["model"] = model["model_name"]
     
-    # base_url 应该包含完整的 URL（包括端口）
+    # base_url 应该包含完整的 URL（包括端口和路径）
     # 如果旧数据有单独的 port，需要合并
     base_url = model.get("base_url", "")
     port = model.get("port")
+    model_type = model.get("model_type", "")
     
     if base_url:
         # 如果有单独的 port 且 base_url 中没有端口，则合并
@@ -115,9 +140,32 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     base_url = f"{base_url}:{port}"
         
+        # 如果 base_url 不包含路径，根据模型类型自动添加默认路径
+        from urllib.parse import urlparse
+        parsed = urlparse(base_url)
+        if not parsed.path or parsed.path == "/":
+            # 根据模型类型添加默认路径
+            if "chat" in model_type or "chat-completions" in model_type:
+                # 对于 chat completions 模型，添加 /v1/chat/completions
+                if base_url.endswith("/"):
+                    base_url = base_url.rstrip("/") + "/v1/chat/completions"
+                else:
+                    base_url = base_url + "/v1/chat/completions"
+            elif "completions" in model_type and "chat" not in model_type:
+                # 对于 completions 模型，添加 /v1/completions
+                if base_url.endswith("/"):
+                    base_url = base_url.rstrip("/") + "/v1/completions"
+                else:
+                    base_url = base_url + "/v1/completions"
+        
         model_args["base_url"] = base_url
     
+    # 对于 API 模型，api_key 可以通过多种方式传递：
+    # 1. 通过 api_key 参数直接传递（OpenAIChatCompletion 等类已支持）
+    # 2. 通过环境变量 OPENAI_API_KEY（如果 api_key 参数没有提供）
+    # 注意：不要通过 header 参数传递，因为 api_models.py 的 header 属性会自动添加 "Bearer " 前缀
     if model.get("api_key"):
+        # 只传递 api_key 参数，让 api_models.py 的 header 属性自动处理 "Bearer " 前缀
         model_args["api_key"] = model["api_key"]
     
     if model.get("max_concurrent"):
@@ -191,31 +239,15 @@ async def list_models():
     return result
 
 
-@router.get("/{model_id}/model-args")
-async def get_model_args_for_eval(model_id: str):
-    """获取用于评测的 model_args（包含完整的 api_key）"""
-    if model_id not in models_db:
-        model_data = load_model_from_file(model_id)
-        if model_data:
-            models_db[model_id] = model_data
-        else:
-            raise HTTPException(status_code=404, detail="模型不存在")
-    
-    model = models_db[model_id]
-    model_args = get_model_args(model)
-    
-    return {
-        "model_type": model["model_type"],
-        "model_args": model_args
-    }
-
-
 class ModelTestRequest(BaseModel):
     """测试模型连接请求"""
+    model_config = {"protected_namespaces": ()}
+    
     model_type: str
     base_url: Optional[str] = None  # 完整的 API URL
     api_key: Optional[str] = None
     model_name: Optional[str] = None
+    model_id: Optional[str] = None  # 如果提供 model_id，将从数据库获取真实的 api_key
 
 
 @router.post("/test-connection")
@@ -231,10 +263,26 @@ async def test_model_connection(request: ModelTestRequest):
         
         test_url = request.base_url.strip()
         
+        # 如果提供了 model_id，从数据库获取真实的 api_key
+        api_key = request.api_key
+        if request.model_id:
+            if request.model_id in models_db:
+                model_data = models_db[request.model_id]
+            else:
+                model_data = load_model_from_file(request.model_id)
+                if model_data:
+                    models_db[request.model_id] = model_data
+                else:
+                    raise HTTPException(status_code=404, detail="模型不存在")
+            
+            # 使用数据库中的真实 api_key（如果存在）
+            if model_data.get("api_key"):
+                api_key = model_data["api_key"]
+        
         # 根据模型类型发送不同的测试请求
         headers = {}
-        if request.api_key:
-            headers["Authorization"] = f"Bearer {request.api_key}"
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         
         if request.model_type in ["openai-chat-completions", "openai-completions", "local-completions"]:
             # OpenAI 兼容 API - 需要模型标识进行测试
@@ -458,10 +506,14 @@ async def update_model(model_id: str, request: ModelUpdateRequest):
         
         # 如果更新 api_key，需要特殊处理
         if "api_key" in update_data:
-            # 如果传入的是 "***" 或空字符串，表示不更新，保持原有值
-            if update_data["api_key"] == "***" or update_data["api_key"] == "":
+            # 如果传入的是 "***"，表示不更新，保持原有值
+            if update_data["api_key"] == "***":
                 del update_data["api_key"]
-            # 否则更新为新值
+            # 如果传入的是空字符串，表示清除 api_key（设置为 None）
+            elif update_data["api_key"] == "":
+                model_data["api_key"] = None
+                del update_data["api_key"]  # 已经从 model_data 中更新，不需要再在 update_data 中处理
+            # 否则更新为新值（包括非空字符串）
         
         for key, value in update_data.items():
             if value is not None:
@@ -492,7 +544,7 @@ async def delete_model(model_id: str):
         if not model_data:
             raise HTTPException(status_code=404, detail="模型不存在")
     
-    # 删除文件
+    # 删除模型文件
     model_file = MODELS_DIR / f"{model_id}.json"
     if model_file.exists():
         model_file.unlink()

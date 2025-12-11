@@ -109,6 +109,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { configsApi } from '../api/configs'
 import { tasksApi } from '../api/tasks'
+import { datasetsApi } from '../api/datasets'
 
 const configs = ref([])
 const availableTasks = ref([])
@@ -223,12 +224,64 @@ const formatTime = (timeStr) => {
 
 const loadAvailableTasks = async () => {
   try {
-    const data = await tasksApi.getAvailableTasks()
-    availableTasks.value = data.subtasks || []
+    // 从 datasets API 获取 /data 目录下的本地数据集
+    // 由于后端限制 page_size 最大为 100，需要分页加载所有数据集
+    let allDatasets = []
+    let page = 1
+    const pageSize = 100  // 后端限制最大为 100
+    let hasMore = true
+    
+    while (hasMore) {
+      const response = await datasetsApi.getDatasets({
+        is_local: true,  // 只获取本地数据集
+        page: page,
+        page_size: pageSize
+      })
+      
+      // 检查响应数据结构
+      if (!response || !response.datasets) {
+        console.warn('数据集 API 返回数据格式异常:', response)
+        break
+      }
+      
+      allDatasets = allDatasets.concat(response.datasets)
+      
+      // 判断是否还有更多数据
+      const total = response.total || 0
+      const currentCount = page * pageSize
+      hasMore = currentCount < total
+      page++
+    }
+    
+    if (allDatasets.length === 0) {
+      availableTasks.value = []
+      console.warn('/data 目录下没有找到数据集')
+      return
+    }
+    
+    // 将数据集转换为任务名称
+    // 优先使用后端返回的 name 字段（这是从 TaskManager 获取的正确任务名称）
+    // 如果没有 name 字段，才根据路径构造
+    const taskNames = allDatasets
+      .filter(dataset => dataset && (dataset.name || dataset.path))  // 过滤无效数据
+      .map(dataset => {
+        // 优先使用 name 字段（这是正确的任务名称，如 "gsm8k"）
+        if (dataset.name) {
+          return dataset.name
+        }
+        // 如果没有 name，则根据路径构造（兼容旧数据）
+        let taskName = dataset.path.replace(/\//g, '_')  // 将路径中的 "/" 替换为 "_"
+        if (dataset.config_name) {
+          taskName = `${taskName}_${dataset.config_name}`
+        }
+        return taskName
+      })
+    
+    // 去重并排序
+    availableTasks.value = [...new Set(taskNames)].sort()
   } catch (error) {
     console.error('加载可用任务列表失败:', error)
-    // 使用默认任务列表
-    availableTasks.value = ['gsm8k', 'hellaswag', 'arc_easy', 'arc_challenge', 'mmlu']
+    availableTasks.value = []
   }
 }
 

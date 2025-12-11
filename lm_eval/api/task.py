@@ -633,6 +633,11 @@ class Task(abc.ABC):
                 f.apply(self._instances)
         else:
             eval_logger.warning("No filter defined, passing through instances")
+            # If no filters are defined, we need to ensure filtered_resps is populated
+            # with the default filter key "default" containing the raw responses
+            for instance in self._instances:
+                if not instance.filtered_resps:
+                    instance.filtered_resps["default"] = instance.resps
             return self._instances
 
     def dump_config(self) -> dict:
@@ -1296,6 +1301,11 @@ class ConfigurableTask(Task):
                 f.apply(self._instances)
         else:
             eval_logger.warning("No filter defined, passing through instances")
+            # If no filters are defined, we need to ensure filtered_resps is populated
+            # with the default filter key "default" containing the raw responses
+            for instance in self._instances:
+                if not instance.filtered_resps:
+                    instance.filtered_resps["default"] = instance.resps
             return self._instances
 
     def should_decontaminate(self):

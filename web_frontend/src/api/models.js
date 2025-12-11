@@ -31,11 +31,6 @@ export const modelsApi = {
     return api.get('/models/types/list')
   },
   
-  // 获取用于评测的 model_args
-  getModelArgs(modelId) {
-    return api.get(`/models/${modelId}/model-args`)
-  },
-  
   // 测试模型连接
   testConnection(data) {
     return api.post('/models/test-connection', data)

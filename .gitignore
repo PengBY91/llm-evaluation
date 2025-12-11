@@ -9,6 +9,7 @@ env/
 *.env
 
 models/
+results/
 
 
 web_frontend/node_modules/
