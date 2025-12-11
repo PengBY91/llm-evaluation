@@ -56,7 +56,7 @@ class ModelCreateRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
     
     name: str
-    model_type: str  # 模型类型：openai-chat-completions, openai-completions, hf, vllm 等
+    model_type: str  # 模型类型：openai-chat-completions（支持 Ollama、vLLM 等）, openai-completions, hf
     description: Optional[str] = None
     base_url: Optional[str] = None  # 完整的 API URL，包含协议、主机、端口和路径
     api_key: Optional[str] = None
@@ -141,17 +141,18 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
                     base_url = f"{base_url}:{port}"
         
         # 如果 base_url 不包含路径，根据模型类型自动添加默认路径
+        # 注意：OpenAI 兼容 API（包括 Ollama、vLLM）通常使用 /v1/chat/completions 或 /v1/completions
         from urllib.parse import urlparse
         parsed = urlparse(base_url)
         if not parsed.path or parsed.path == "/":
             # 根据模型类型添加默认路径
-            if "chat" in model_type or "chat-completions" in model_type:
+            if model_type == "openai-chat-completions":
                 # 对于 chat completions 模型，添加 /v1/chat/completions
                 if base_url.endswith("/"):
                     base_url = base_url.rstrip("/") + "/v1/chat/completions"
                 else:
                     base_url = base_url + "/v1/chat/completions"
-            elif "completions" in model_type and "chat" not in model_type:
+            elif model_type == "openai-completions":
                 # 对于 completions 模型，添加 /v1/completions
                 if base_url.endswith("/"):
                     base_url = base_url.rstrip("/") + "/v1/completions"
@@ -284,7 +285,7 @@ async def test_model_connection(request: ModelTestRequest):
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         
-        if request.model_type in ["openai-chat-completions", "openai-completions", "local-completions"]:
+        if request.model_type in ["openai-chat-completions", "openai-completions"]:
             # OpenAI 兼容 API - 需要模型标识进行测试
             if not request.model_name:
                 return {
@@ -307,17 +308,57 @@ async def test_model_connection(request: ModelTestRequest):
                 response = requests.get(models_url, headers=headers, timeout=5)
                 if response.status_code == 200:
                     models_data = response.json()
-                    available_models = [m.get("id", "") for m in models_data.get("data", [])]
+                    # 支持多种响应格式：
+                    # 1. OpenAI 格式: {"data": [{"id": "model1"}, ...]}
+                    # 2. 直接列表格式: [{"id": "model1"}, ...]
+                    # 3. Ollama 等格式: {"models": [{"name": "model1"}, ...]}
+                    if "data" in models_data:
+                        available_models = [m.get("id", "") or m.get("name", "") for m in models_data.get("data", [])]
+                    elif isinstance(models_data, list):
+                        available_models = [m.get("id", "") or m.get("name", "") for m in models_data]
+                    elif "models" in models_data:
+                        available_models = [m.get("id", "") or m.get("name", "") for m in models_data.get("models", [])]
             except Exception:
-                pass
+                # 如果 /v1/models 失败，可能是 Ollama 服务，尝试原生 API
+                # 尝试从 base_url 提取基础 URL（去掉 /v1 部分）
+                try:
+                    base_host = test_url.rstrip('/')
+                    if '/v1' in base_host:
+                        base_host = base_host[:base_host.rindex('/v1')]
+                    ollama_tags_url = base_host.rstrip('/') + '/api/tags'
+                    ollama_response = requests.get(ollama_tags_url, timeout=5)
+                    if ollama_response.status_code == 200:
+                        ollama_data = ollama_response.json()
+                        if "models" in ollama_data:
+                            available_models = [m.get("name", "") for m in ollama_data.get("models", [])]
+                except Exception:
+                    pass
             
             # 构建 completions 端点 URL
             completions_url = test_url.rstrip('/')
-            if '/v1' not in completions_url:
-                if request.model_type == "openai-chat-completions":
-                    completions_url = completions_url.rstrip('/') + '/v1/chat/completions'
+            # 检查 URL 是否已经包含完整的端点路径
+            if not (completions_url.endswith('/chat/completions') or completions_url.endswith('/completions')):
+                # 如果 URL 以 /v1 结尾，说明是基础 URL，需要添加端点路径
+                if completions_url.endswith('/v1'):
+                    if request.model_type == "openai-chat-completions":
+                        completions_url = completions_url + '/chat/completions'
+                    else:
+                        completions_url = completions_url + '/completions'
+                # 如果 URL 包含 /v1 但不以 /v1 结尾，可能是其他路径
+                elif '/v1' in completions_url:
+                    # URL 已经包含 /v1，可能不需要再添加
+                    if request.model_type == "openai-chat-completions":
+                        if not completions_url.endswith('/chat/completions'):
+                            completions_url = completions_url.rstrip('/') + '/chat/completions'
+                    else:
+                        if not completions_url.endswith('/completions'):
+                            completions_url = completions_url.rstrip('/') + '/completions'
+                # 如果 URL 不包含 /v1，添加完整的路径
                 else:
-                    completions_url = completions_url.rstrip('/') + '/v1/completions'
+                    if request.model_type == "openai-chat-completions":
+                        completions_url = completions_url.rstrip('/') + '/v1/chat/completions'
+                    else:
+                        completions_url = completions_url.rstrip('/') + '/v1/completions'
             
             # 根据模型类型构建不同的测试 payload，使用实际的模型名称
             if request.model_type == "openai-chat-completions":
@@ -370,10 +411,27 @@ async def test_model_connection(request: ModelTestRequest):
                         "details": "API Key 无效或已过期，请检查 API Key 配置"
                     }
                 elif response.status_code == 404:
+                    # 404 错误，提供更详细的诊断信息
+                    error_msg = response.text[:500] if response.text else ""
+                    details = f"模型 '{request.model_name}' 不存在或无法访问"
+                    
+                    # 尝试提供有用的诊断信息
+                    if available_models:
+                        details += f"。可用模型列表: {', '.join(available_models[:10])}"
+                        if len(available_models) > 10:
+                            details += f" 等共 {len(available_models)} 个模型"
+                        details += "。请检查模型标识是否正确，或者模型是否已正确加载。"
+                    else:
+                        details += "。无法获取可用模型列表，可能是 API 端点格式不同或需要特殊配置。"
+                        details += " 请确认：1) 模型名称是否正确 2) 模型是否已在服务端加载 3) API URL 是否正确"
+                    
+                    if error_msg:
+                        details += f" 错误详情: {error_msg}"
+                    
                     return {
                         "success": False,
                         "message": "模型不存在",
-                        "details": f"模型 '{request.model_name}' 不存在，请检查模型标识是否正确"
+                        "details": details
                     }
                 else:
                     return {
@@ -398,39 +456,6 @@ async def test_model_connection(request: ModelTestRequest):
                     "success": False,
                     "message": "连接失败",
                     "details": f"错误: {str(e)}"
-                }
-        
-        elif request.model_type == "vllm":
-            # vLLM - 尝试访问健康检查端点
-            health_url = test_url.rstrip('/') + '/health'
-            try:
-                response = requests.get(health_url, headers=headers, timeout=5)
-                if response.status_code == 200:
-                    details = "vLLM 服务正常运行"
-                    if request.model_name:
-                        details += f"，配置的模型标识: {request.model_name}"
-                    return {
-                        "success": True,
-                        "message": "连接成功",
-                        "details": details
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": "连接失败",
-                        "details": f"vLLM 服务返回状态码: {response.status_code}"
-                    }
-            except requests.exceptions.ConnectionError:
-                return {
-                    "success": False,
-                    "message": "连接失败",
-                    "details": "无法连接到 vLLM 服务，请检查 URL 和端口"
-                }
-            except Exception as e:
-                return {
-                    "success": False,
-                    "message": "连接失败",
-                    "details": f"无法连接到 vLLM 服务: {str(e)}"
                 }
         
         elif request.model_type == "hf":
@@ -564,37 +589,23 @@ async def get_model_types():
             {
                 "value": "openai-chat-completions",
                 "label": "OpenAI Chat Completions",
-                "description": "OpenAI 兼容的聊天完成 API",
+                "description": "OpenAI 兼容的聊天完成 API（支持 Ollama、vLLM、OpenAI 等）",
                 "requires": ["base_url", "model_name"],
                 "optional": ["api_key", "max_concurrent", "max_tokens"]
             },
             {
                 "value": "openai-completions",
                 "label": "OpenAI Completions",
-                "description": "OpenAI 兼容的完成 API",
+                "description": "OpenAI 兼容的文本完成 API",
                 "requires": ["base_url", "model_name"],
                 "optional": ["api_key", "max_concurrent", "max_tokens"]
             },
             {
                 "value": "hf",
                 "label": "HuggingFace",
-                "description": "HuggingFace Transformers 模型",
+                "description": "HuggingFace Transformers 本地模型",
                 "requires": ["model_name"],
                 "optional": ["port", "max_tokens"]
-            },
-            {
-                "value": "vllm",
-                "label": "vLLM",
-                "description": "vLLM 推理服务",
-                "requires": ["base_url"],
-                "optional": ["port", "max_concurrent", "max_tokens"]
-            },
-            {
-                "value": "local-completions",
-                "label": "Local Completions",
-                "description": "本地完成服务",
-                "requires": ["base_url"],
-                "optional": ["port", "max_concurrent"]
             }
         ]
     }

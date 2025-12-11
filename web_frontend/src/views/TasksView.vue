@@ -132,7 +132,6 @@
             <el-option label="OpenAI Chat Completions" value="openai-chat-completions" />
             <el-option label="OpenAI Completions" value="openai-completions" />
             <el-option label="HuggingFace" value="hf" />
-            <el-option label="vLLM" value="vllm" />
           </el-select>
         </el-form-item>
         <el-form-item label="评测任务" required>
@@ -293,9 +292,7 @@ const getModelTypeLabel = (type) => {
   const typeMap = {
     'openai-chat-completions': 'OpenAI Chat',
     'openai-completions': 'OpenAI Completions',
-    'hf': 'HuggingFace',
-    'vllm': 'vLLM',
-    'local-completions': 'Local Completions'
+    'hf': 'HuggingFace'
   }
   return typeMap[type] || type
 }

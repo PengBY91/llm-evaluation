@@ -10,26 +10,26 @@
 
     <el-table :data="models" v-loading="loading" stripe>
       <el-table-column prop="name" label="模型名称" width="200" />
-      <el-table-column prop="model_type" label="模型类型" width="180">
+      <el-table-column prop="model_type" label="模型类型" width="150">
         <template #default="{ row }">
-          <el-tag>{{ getModelTypeLabel(row.model_type) }}</el-tag>
+          <el-tag size="small">{{ getModelTypeLabel(row.model_type) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" width="180">
+      <el-table-column prop="model_name" label="模型标识" width="200">
         <template #default="{ row }">
-          {{ formatTime(row.created_at) }}
+          {{ row.model_name || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column prop="base_url" label="API URL" min-width="200" show-overflow-tooltip />
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="viewModel(row)">查看详情</el-button>
           <el-button 
             size="small" 
             type="success"
             @click="testModelConnection(row)"
             :loading="testingModels[row.id]"
           >
-            测试连接
+            测试
           </el-button>
           <el-button size="small" @click="editModel(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="deleteModel(row.id)">删除</el-button>
@@ -37,56 +37,6 @@
       </el-table-column>
     </el-table>
 
-    <!-- 模型详情对话框 -->
-    <el-dialog 
-      v-model="showDetailDialog" 
-      title="模型详情" 
-      width="800px"
-    >
-      <div v-if="currentModel">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="模型名称">{{ currentModel.name }}</el-descriptions-item>
-          <el-descriptions-item label="模型类型">
-            <el-tag>{{ getModelTypeLabel(currentModel.model_type) }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="模型标识">
-            {{ currentModel.model_name || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="API URL" :span="2">
-            <span style="word-break: break-all;">{{ currentModel.base_url || '-' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="API Key">
-            <el-tag v-if="currentModel.api_key" type="info">已配置</el-tag>
-            <span v-else>-</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="最大并发数">
-            {{ currentModel.max_concurrent || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="最长Token">
-            {{ currentModel.max_tokens || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="创建时间">
-            {{ formatTime(currentModel.created_at) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="更新时间">
-            {{ formatTime(currentModel.updated_at) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="描述" :span="2">
-            {{ currentModel.description || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="其他配置" :span="2">
-            <pre v-if="currentModel.other_config && Object.keys(currentModel.other_config).length > 0" style="margin: 0; background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">
-{{ JSON.stringify(currentModel.other_config, null, 2) }}
-            </pre>
-            <span v-else>-</span>
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
-      <template #footer>
-        <el-button @click="showDetailDialog = false">关闭</el-button>
-        <el-button type="primary" @click="handleEditFromDetail">编辑</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 创建/编辑模型对话框 -->
     <el-dialog 
@@ -94,7 +44,7 @@
       :title="editingModel ? '编辑模型' : '添加模型'" 
       width="800px"
     >
-      <el-form :model="modelForm" label-width="140px" :rules="rules" ref="modelFormRef">
+      <el-form :model="modelForm" label-width="120px" :rules="rules" ref="modelFormRef">
         <el-form-item label="模型名称" prop="name" required>
           <el-input v-model="modelForm.name" placeholder="请输入模型名称" />
         </el-form-item>
@@ -103,43 +53,36 @@
             v-model="modelForm.model_type" 
             placeholder="请选择模型类型"
             style="width: 100%"
-            @change="handleModelTypeChange"
           >
             <el-option 
               v-for="type in modelTypes" 
               :key="type.value" 
               :label="type.label" 
               :value="type.value"
-            >
-              <div>
-                <div>{{ type.label }}</div>
-                <div style="font-size: 12px; color: #999;">{{ type.description }}</div>
-              </div>
-            </el-option>
+            />
           </el-select>
         </el-form-item>
-        <el-form-item label="模型标识" prop="model_name">
+        <el-form-item label="模型标识" prop="model_name" :required="needsModelName">
           <el-input 
             v-model="modelForm.model_name" 
-            placeholder="例如: gpt-3.5-turbo, deepseek-chat"
+            placeholder="例如: gpt-3.5-turbo, qwen3:8b"
           />
-          <div class="form-tip">模型的具体名称或标识符{{ needsModelName ? '（必需）' : '（可选）' }}</div>
+          <div class="form-tip">{{ needsModelName ? '（必需）' : '（可选）' }}</div>
         </el-form-item>
-        <el-form-item label="API URL">
+        <el-form-item label="API URL" :required="needsBaseUrl">
           <div style="display: flex; gap: 10px;">
             <el-input 
               v-model="apiUrl" 
-              placeholder="例如: http://localhost:11434/v1 或 https://api.example.com/v1"
+              placeholder="例如: http://localhost:11434/v1"
             />
             <el-button 
               @click="testConnection" 
               :loading="testingConnection"
               type="primary"
             >
-              测试连接
+              测试
             </el-button>
           </div>
-          <div class="form-tip">完整的 API 服务地址，包含协议、主机和端口{{ needsBaseUrl ? '（必需）' : '（可选）' }}</div>
           <el-alert
             v-if="testResult"
             :title="testResult.message"
@@ -147,47 +90,56 @@
             :description="testResult.details"
             :closable="true"
             @close="testResult = null"
-            style="margin-top: 10px;"
+            style="margin-top: 8px;"
           />
         </el-form-item>
-        <el-form-item label="API Key" prop="api_key">
+        <el-form-item label="API Key">
           <el-input 
             v-model="modelForm.api_key" 
             type="password" 
             show-password
-            placeholder="输入 API Key（可选）"
+            placeholder="可选，如果需要认证"
           />
-          <div class="form-tip">API 密钥，如果需要认证</div>
         </el-form-item>
-        <el-form-item label="最大并发数" prop="max_concurrent">
-          <el-input-number 
-            v-model="modelForm.max_concurrent" 
-            :min="1" 
-            :max="100"
-            placeholder="最大并发数"
-          />
-          <div class="form-tip">同时处理的最大请求数</div>
-        </el-form-item>
-        <el-form-item label="最长Token" prop="max_tokens">
-          <el-input-number 
-            v-model="modelForm.max_tokens" 
-            :min="1"
-            placeholder="最长Token数"
-          />
-          <div class="form-tip">生成的最大 token 数量</div>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="modelForm.description" type="textarea" :rows="2" />
-        </el-form-item>
-        <el-form-item label="其他配置">
-          <el-input 
-            v-model="otherConfigStr" 
-            type="textarea" 
-            :rows="3"
-            placeholder='JSON 格式，例如: {"temperature": 0.7, "top_p": 0.9}'
-          />
-          <div class="form-tip">额外的配置参数（JSON 格式）</div>
-        </el-form-item>
+        
+        <!-- 高级选项 -->
+        <el-divider>
+          <el-button text @click="showAdvancedOptions = !showAdvancedOptions">
+            {{ showAdvancedOptions ? '收起' : '展开' }}高级选项
+            <el-icon><ArrowDown v-if="!showAdvancedOptions" /><ArrowUp v-else /></el-icon>
+          </el-button>
+        </el-divider>
+        
+        <el-collapse-transition>
+          <div v-show="showAdvancedOptions">
+            <el-form-item label="最大并发数">
+              <el-input-number 
+                v-model="modelForm.max_concurrent" 
+                :min="1" 
+                :max="100"
+                style="width: 100%"
+              />
+            </el-form-item>
+            <el-form-item label="最长Token">
+              <el-input-number 
+                v-model="modelForm.max_tokens" 
+                :min="1"
+                style="width: 100%"
+              />
+            </el-form-item>
+            <el-form-item label="描述">
+              <el-input v-model="modelForm.description" type="textarea" :rows="2" />
+            </el-form-item>
+            <el-form-item label="其他配置">
+              <el-input 
+                v-model="otherConfigStr" 
+                type="textarea" 
+                :rows="3"
+                placeholder='JSON 格式，例如: {"temperature": 0.7}'
+              />
+            </el-form-item>
+          </div>
+        </el-collapse-transition>
       </el-form>
       <template #footer>
         <el-button @click="cancelEdit">取消</el-button>
@@ -200,16 +152,15 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import { modelsApi } from '../api/models'
 
 const models = ref([])
 const modelTypes = ref([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
-const showDetailDialog = ref(false)
 const editingModel = ref(null)
-const currentModel = ref(null)
+const showAdvancedOptions = ref(false)
 const modelFormRef = ref(null)
 const otherConfigStr = ref('{}')
 const apiUrl = ref('')  // 合并的 URL 字段
@@ -276,11 +227,9 @@ const loadModelTypes = async () => {
     console.error('加载模型类型失败:', error)
     // 使用默认类型
     modelTypes.value = [
-      { value: 'openai-chat-completions', label: 'OpenAI Chat Completions', description: 'OpenAI 兼容的聊天完成 API' },
+      { value: 'openai-chat-completions', label: 'OpenAI Chat Completions', description: 'OpenAI 兼容的聊天完成 API（支持 Ollama、vLLM 等）' },
       { value: 'openai-completions', label: 'OpenAI Completions', description: 'OpenAI 兼容的完成 API' },
-      { value: 'hf', label: 'HuggingFace', description: 'HuggingFace Transformers 模型' },
-      { value: 'vllm', label: 'vLLM', description: 'vLLM 推理服务' },
-      { value: 'local-completions', label: 'Local Completions', description: '本地完成服务' }
+      { value: 'hf', label: 'HuggingFace', description: 'HuggingFace Transformers 模型' }
     ]
   }
 }
@@ -288,6 +237,7 @@ const loadModelTypes = async () => {
 const handleAddModel = () => {
   editingModel.value = null
   resetForm()
+  showAdvancedOptions.value = false
   showCreateDialog.value = true
 }
 
@@ -317,6 +267,8 @@ const editModel = (model) => {
     apiUrl.value = model.base_url || ''
   }
   otherConfigStr.value = JSON.stringify(model.other_config || {}, null, 2)
+  // 如果有高级选项的值，自动展开
+  showAdvancedOptions.value = !!(model.max_concurrent || model.max_tokens || model.description || (model.other_config && Object.keys(model.other_config).length > 0))
   showCreateDialog.value = true
 }
 
@@ -341,6 +293,7 @@ const resetForm = () => {
   apiUrl.value = ''
   otherConfigStr.value = '{}'
   testResult.value = null
+  showAdvancedOptions.value = false
   if (modelFormRef.value) {
     modelFormRef.value.resetFields()
   }
@@ -516,28 +469,7 @@ const deleteModel = async (modelId) => {
   }
 }
 
-const formatTime = (timeStr) => {
-  if (!timeStr) return ''
-  return new Date(timeStr).toLocaleString('zh-CN')
-}
 
-const viewModel = async (model) => {
-  try {
-    // 获取完整的模型信息（包括可能被隐藏的字段）
-    const fullModel = await modelsApi.getModel(model.id)
-    currentModel.value = fullModel
-    showDetailDialog.value = true
-  } catch (error) {
-    ElMessage.error('获取模型详情失败: ' + error.message)
-  }
-}
-
-const handleEditFromDetail = () => {
-  if (currentModel.value) {
-    editModel(currentModel.value)
-    showDetailDialog.value = false
-  }
-}
 
 const testModelConnection = async (model) => {
   if (!model.base_url) {

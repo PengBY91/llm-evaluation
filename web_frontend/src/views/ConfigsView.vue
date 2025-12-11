@@ -50,7 +50,6 @@
             <el-option label="OpenAI Chat Completions" value="openai-chat-completions" />
             <el-option label="OpenAI Completions" value="openai-completions" />
             <el-option label="HuggingFace" value="hf" />
-            <el-option label="vLLM" value="vllm" />
           </el-select>
         </el-form-item>
         <el-form-item label="模型参数" required>
