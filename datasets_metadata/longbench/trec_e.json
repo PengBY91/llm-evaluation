@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/trec_e",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 300
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "trec_e",
+  "task_name": "longbench_trec_e",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/trec_e.yaml",
+  "tags": [
+    "longbench_fewshot_tasks_e",
+    "longbench_tasks_e"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

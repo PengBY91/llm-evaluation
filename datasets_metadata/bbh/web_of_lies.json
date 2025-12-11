@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/bbh/web_of_lies",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 250
+  },
+  "path": "SaylorTwift/bbh",
+  "config_name": "web_of_lies",
+  "task_name": "bbh_zeroshot_web_of_lies",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/bbh/zeroshot/web_of_lies.yaml",
+  "tags": [],
+  "category": "其他",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

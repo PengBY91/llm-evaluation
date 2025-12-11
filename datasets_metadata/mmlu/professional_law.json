@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/professional_law",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 1534,
+    "validation": 170,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "professional_law",
+  "task_name": "mmlu_professional_law_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_professional_law.yaml",
+  "tags": [
+    "mmlu_humanities_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

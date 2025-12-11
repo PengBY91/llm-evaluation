@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/elementary_mathematics",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 378,
+    "validation": 41,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "elementary_mathematics",
+  "task_name": "mmlu_elementary_mathematics_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_elementary_mathematics.yaml",
+  "tags": [
+    "mmlu_stem_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

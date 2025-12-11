@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/clinical_medicine",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 200,
+    "val": 22,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "clinical_medicine",
+  "task_name": "ceval-valid_clinical_medicine",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_clinical_medicine.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

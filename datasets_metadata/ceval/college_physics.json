@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/college_physics",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 176,
+    "val": 19,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "college_physics",
+  "task_name": "ceval-valid_college_physics",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_college_physics.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/legal_professional",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 215,
+    "val": 23,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "legal_professional",
+  "task_name": "ceval-valid_legal_professional",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_legal_professional.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

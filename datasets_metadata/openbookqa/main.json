@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/openbookqa/main",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 500,
+    "test": 500
+  },
+  "path": "openbookqa",
+  "config_name": "main",
+  "task_name": "openbookqa",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/openbookqa/openbookqa.yaml",
+  "tags": [],
+  "category": "科学问答",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

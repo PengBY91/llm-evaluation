@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/electrical_engineering",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 145,
+    "validation": 16,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "electrical_engineering",
+  "task_name": "mmlu_electrical_engineering_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_electrical_engineering.yaml",
+  "tags": [
+    "mmlu_stem_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

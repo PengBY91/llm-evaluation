@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/hendrycks_math/algebra",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 1187
+  },
+  "path": "EleutherAI/hendrycks_math",
+  "config_name": "algebra",
+  "task_name": "hendrycks_math_algebra",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/hendrycks_math/hendrycks_math_algebra.yaml",
+  "tags": [
+    "math_word_problems"
+  ],
+  "category": "数学推理",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

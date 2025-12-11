@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/musique",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 200
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "musique",
+  "task_name": "longbench_musique",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/musique.yaml",
+  "tags": [
+    "longbench_multi_tasks",
+    "longbench_tasks"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

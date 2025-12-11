@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/bbh/movie_recommendation",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 250
+  },
+  "path": "SaylorTwift/bbh",
+  "config_name": "movie_recommendation",
+  "task_name": "bbh_zeroshot_movie_recommendation",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/bbh/zeroshot/movie_recommendation.yaml",
+  "tags": [],
+  "category": "其他",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

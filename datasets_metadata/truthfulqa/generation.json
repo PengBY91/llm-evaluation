@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/truthfulqa/generation",
+  "is_local": true,
+  "splits": [
+    "validation"
+  ],
+  "num_examples": {
+    "validation": 817
+  },
+  "path": "truthful_qa",
+  "config_name": "generation",
+  "task_name": "truthfulqa_gen",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/truthfulqa/truthfulqa_gen.yaml",
+  "tags": [
+    "truthfulqa"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

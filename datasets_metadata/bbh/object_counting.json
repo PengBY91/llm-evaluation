@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/bbh/object_counting",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 250
+  },
+  "path": "SaylorTwift/bbh",
+  "config_name": "object_counting",
+  "task_name": "bbh_zeroshot_object_counting",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/bbh/zeroshot/object_counting.yaml",
+  "tags": [],
+  "category": "其他",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

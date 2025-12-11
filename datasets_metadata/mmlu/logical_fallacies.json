@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/logical_fallacies",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 163,
+    "validation": 18,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "logical_fallacies",
+  "task_name": "mmlu_logical_fallacies_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_logical_fallacies.yaml",
+  "tags": [
+    "mmlu_humanities_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

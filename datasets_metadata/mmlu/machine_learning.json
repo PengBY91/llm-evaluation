@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/machine_learning",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 112,
+    "validation": 11,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "machine_learning",
+  "task_name": "mmlu_machine_learning_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_machine_learning.yaml",
+  "tags": [
+    "mmlu_stem_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

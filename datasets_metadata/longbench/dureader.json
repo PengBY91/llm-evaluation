@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/dureader",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 200
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "dureader",
+  "task_name": "longbench_dureader",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/dureader.yaml",
+  "tags": [
+    "longbench_multi_tasks",
+    "longbench_tasks"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

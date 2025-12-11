@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/winogrande/winogrande_xl",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation"
+  ],
+  "num_examples": {
+    "test": 1767,
+    "validation": 1267
+  },
+  "path": "winogrande",
+  "config_name": "winogrande_xl",
+  "task_name": "winogrande",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/winogrande/default.yaml",
+  "tags": [],
+  "category": "常识推理",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

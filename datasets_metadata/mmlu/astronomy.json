@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/astronomy",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 152,
+    "validation": 16,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "astronomy",
+  "task_name": "mmlu_astronomy_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_astronomy.yaml",
+  "tags": [
+    "mmlu_stem_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

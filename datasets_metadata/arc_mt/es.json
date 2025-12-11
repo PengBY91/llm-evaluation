@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/arc_mt/es",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation"
+  ],
+  "num_examples": {
+    "test": 1172,
+    "validation": 299
+  },
+  "path": "LumiOpen/arc_challenge_mt",
+  "config_name": "es",
+  "task_name": "arc_challenge_mt_es",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/arc_mt/arc_challenge_mt_es.yaml",
+  "tags": [
+    "arc_challenge_mt"
+  ],
+  "category": "科学问答",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

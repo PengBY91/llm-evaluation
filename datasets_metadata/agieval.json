@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/agieval",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 200
+  },
+  "path": "hails/agieval-gaokao-physics",
+  "config_name": null,
+  "task_name": "agieval_gaokao_physics",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/agieval/gaokao-physics.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/business_administration",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 301,
+    "val": 33,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "business_administration",
+  "task_name": "ceval-valid_business_administration",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_business_administration.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

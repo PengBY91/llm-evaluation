@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/super_glue/copa",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 100,
+    "test": 500
+  },
+  "path": "super_glue",
+  "config_name": "copa",
+  "task_name": "copa",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/super_glue/copa/default.yaml",
+  "tags": [
+    "super-glue-lm-eval-v1"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

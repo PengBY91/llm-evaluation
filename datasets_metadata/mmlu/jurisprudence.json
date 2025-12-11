@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/jurisprudence",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 108,
+    "validation": 11,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "jurisprudence",
+  "task_name": "mmlu_jurisprudence_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_jurisprudence.yaml",
+  "tags": [
+    "mmlu_humanities_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

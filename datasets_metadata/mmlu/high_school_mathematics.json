@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/high_school_mathematics",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 270,
+    "validation": 29,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "high_school_mathematics",
+  "task_name": "mmlu_high_school_mathematics_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_high_school_mathematics.yaml",
+  "tags": [
+    "mmlu_stem_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

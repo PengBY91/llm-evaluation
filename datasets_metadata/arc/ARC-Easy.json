@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/arc/ARC-Easy",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation"
+  ],
+  "num_examples": {
+    "test": 2376,
+    "validation": 570
+  },
+  "path": "allenai/ai2_arc",
+  "config_name": "ARC-Easy",
+  "task_name": "arc_easy",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/arc/arc_easy.yaml",
+  "tags": [
+    "ai2_arc"
+  ],
+  "category": "科学问答",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

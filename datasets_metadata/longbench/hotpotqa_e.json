@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/hotpotqa_e",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 300
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "hotpotqa_e",
+  "task_name": "longbench_hotpotqa_e",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/hotpotqa_e.yaml",
+  "tags": [
+    "longbench_multi_tasks_e",
+    "longbench_tasks_e"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

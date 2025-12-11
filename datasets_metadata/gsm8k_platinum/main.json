@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/gsm8k_platinum/main",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 1209
+  },
+  "path": "madrylab/gsm8k-platinum",
+  "config_name": "main",
+  "task_name": "gsm8k_platinum_cot_llama",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/gsm8k_platinum/gsm8k-platinum-cot-llama.yaml",
+  "tags": [
+    "chain_of_thought"
+  ],
+  "category": "数学推理",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

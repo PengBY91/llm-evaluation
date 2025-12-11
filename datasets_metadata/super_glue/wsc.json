@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/super_glue/wsc.fixed",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 104,
+    "test": 146
+  },
+  "path": "super_glue",
+  "config_name": "wsc.fixed",
+  "task_name": "wsc",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/super_glue/wsc/default.yaml",
+  "tags": [
+    "super-glue-lm-eval-v1"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/super_glue/boolq",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 3270,
+    "test": 3245
+  },
+  "path": "super_glue",
+  "config_name": "boolq",
+  "task_name": "boolq-seq2seq",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/super_glue/boolq/seq2seq.yaml",
+  "tags": [
+    "super-glue-lm-eval-v1-seq2seq"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 0.0
+  }
+}

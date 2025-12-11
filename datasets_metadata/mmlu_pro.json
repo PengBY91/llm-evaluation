@@ -1,0 +1,18 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu_pro",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation"
+  ],
+  "num_examples": {
+    "test": 12032,
+    "validation": 70
+  },
+  "path": "mmlu_pro",
+  "config_name": null,
+  "task_name": null,
+  "yaml_path": null,
+  "tags": [],
+  "category": "多任务理解"
+}

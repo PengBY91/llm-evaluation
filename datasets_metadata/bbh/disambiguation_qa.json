@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/bbh/disambiguation_qa",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 250
+  },
+  "path": "SaylorTwift/bbh",
+  "config_name": "disambiguation_qa",
+  "task_name": "bbh_zeroshot_disambiguation_qa",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/bbh/zeroshot/disambiguation_qa.yaml",
+  "tags": [],
+  "category": "其他",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/xquad/xquad.zh",
+  "is_local": true,
+  "splits": [
+    "validation"
+  ],
+  "num_examples": {
+    "validation": 1190
+  },
+  "path": "xquad",
+  "config_name": "xquad.zh",
+  "task_name": "xquad_zh",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/xquad/xquad_zh.yaml",
+  "tags": [
+    "xquad"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

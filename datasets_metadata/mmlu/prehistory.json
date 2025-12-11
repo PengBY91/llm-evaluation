@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/prehistory",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 324,
+    "validation": 35,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "prehistory",
+  "task_name": "mmlu_prehistory_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_prehistory.yaml",
+  "tags": [
+    "mmlu_humanities_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

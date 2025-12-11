@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/repobench-p_e",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 300
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "repobench-p_e",
+  "task_name": "longbench_repobench-p_e",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/repobench-p_e.yaml",
+  "tags": [
+    "longbench_code_tasks_e",
+    "longbench_tasks_e"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

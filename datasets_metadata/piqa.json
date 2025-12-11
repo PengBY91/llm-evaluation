@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/piqa",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 1838,
+    "test": 3084
+  },
+  "path": "baber/piqa",
+  "config_name": null,
+  "task_name": "piqa",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/piqa/piqa.yaml",
+  "tags": [],
+  "category": "常识推理",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

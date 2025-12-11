@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/sciq",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 1000,
+    "test": 1000
+  },
+  "path": "sciq",
+  "config_name": null,
+  "task_name": "sciq",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/sciq/sciq.yaml",
+  "tags": [],
+  "category": "科学问答",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

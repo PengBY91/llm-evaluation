@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/public_relations",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 110,
+    "validation": 12,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "public_relations",
+  "task_name": "mmlu_public_relations_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_public_relations.yaml",
+  "tags": [
+    "mmlu_social_sciences_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

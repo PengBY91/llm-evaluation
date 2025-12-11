@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/super_glue/rte",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 277,
+    "test": 3000
+  },
+  "path": "super_glue",
+  "config_name": "rte",
+  "task_name": "sglue_rte",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/super_glue/rte/default.yaml",
+  "tags": [
+    "super-glue-lm-eval-v1"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 0.0
+  }
+}

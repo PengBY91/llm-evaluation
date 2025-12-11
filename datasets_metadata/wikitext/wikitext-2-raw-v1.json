@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/wikitext/wikitext-2-raw-v1",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 60,
+    "test": 62
+  },
+  "path": "EleutherAI/wikitext_document_level",
+  "config_name": "wikitext-2-raw-v1",
+  "task_name": "wikitext",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/wikitext/wikitext.yaml",
+  "tags": [],
+  "category": "语言建模",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

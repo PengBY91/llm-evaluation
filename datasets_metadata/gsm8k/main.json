@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/gsm8k/main",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 1319
+  },
+  "path": "gsm8k",
+  "config_name": "main",
+  "task_name": "gsm8k_cot_self_consistency",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/gsm8k/gsm8k-cot-self-consistency.yaml",
+  "tags": [
+    "chain_of_thought",
+    "self_consistency"
+  ],
+  "category": "数学推理",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

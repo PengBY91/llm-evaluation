@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/bbh/reasoning_about_colored_objects",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 250
+  },
+  "path": "SaylorTwift/bbh",
+  "config_name": "reasoning_about_colored_objects",
+  "task_name": "bbh_zeroshot_reasoning_about_colored_objects",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/bbh/zeroshot/reasoning_about_colored_objects.yaml",
+  "tags": [],
+  "category": "其他",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

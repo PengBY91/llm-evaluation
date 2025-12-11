@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/arc/ARC-Challenge",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation"
+  ],
+  "num_examples": {
+    "test": 1172,
+    "validation": 299
+  },
+  "path": "allenai/ai2_arc",
+  "config_name": "ARC-Challenge",
+  "task_name": "arc_challenge",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/arc/arc_challenge.yaml",
+  "tags": [
+    "ai2_arc"
+  ],
+  "category": "科学问答",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

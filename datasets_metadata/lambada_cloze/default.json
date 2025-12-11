@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/lambada_cloze/default",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 5153
+  },
+  "path": "EleutherAI/lambada_openai",
+  "config_name": "default",
+  "task_name": "lambada_openai_cloze_yaml",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/lambada_cloze/lambada_openai_cloze.yaml",
+  "tags": [
+    "lambada_cloze"
+  ],
+  "category": "语言建模",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/humaneval",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 164
+  },
+  "path": "openai/openai_humaneval",
+  "config_name": null,
+  "task_name": "humaneval_instruct",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/humaneval/humaneval_instruct.yaml",
+  "tags": [],
+  "category": "其他",
+  "task_metadata": {
+    "version": 4.0
+  }
+}

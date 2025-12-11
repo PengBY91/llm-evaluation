@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/moral_disputes",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 346,
+    "validation": 38,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "moral_disputes",
+  "task_name": "mmlu_moral_disputes_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_moral_disputes.yaml",
+  "tags": [
+    "mmlu_humanities_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

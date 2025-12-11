@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/lambada/default",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 5153
+  },
+  "path": "EleutherAI/lambada_openai",
+  "config_name": "default",
+  "task_name": "lambada_openai",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/lambada/lambada_openai.yaml",
+  "tags": [
+    "lambada"
+  ],
+  "category": "语言建模",
+  "task_metadata": {
+    "version": 1.0
+  }
+}

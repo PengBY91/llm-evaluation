@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/teacher_qualification",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 399,
+    "val": 44,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "teacher_qualification",
+  "task_name": "ceval-valid_teacher_qualification",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_teacher_qualification.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/qasper_e",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 224
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "qasper_e",
+  "task_name": "longbench_qasper_e",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/qasper_e.yaml",
+  "tags": [
+    "longbench_single_tasks_e",
+    "longbench_tasks_e"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

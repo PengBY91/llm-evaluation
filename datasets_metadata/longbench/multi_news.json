@@ -1,0 +1,22 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/longbench/multi_news",
+  "is_local": true,
+  "splits": [
+    "test"
+  ],
+  "num_examples": {
+    "test": 200
+  },
+  "path": "Xnhyacinth/LongBench",
+  "config_name": "multi_news",
+  "task_name": "longbench_multi_news",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/longbench/multi_news.yaml",
+  "tags": [
+    "longbench_summarization_tasks",
+    "longbench_tasks"
+  ],
+  "category": "其他",
+  "task_metadata": {
+    "version": 5.0
+  }
+}

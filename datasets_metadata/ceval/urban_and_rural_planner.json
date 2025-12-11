@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/urban_and_rural_planner",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 418,
+    "val": 46,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "urban_and_rural_planner",
+  "task_name": "ceval-valid_urban_and_rural_planner",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_urban_and_rural_planner.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

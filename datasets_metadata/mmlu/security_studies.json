@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/security_studies",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 245,
+    "validation": 27,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "security_studies",
+  "task_name": "mmlu_security_studies_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_security_studies.yaml",
+  "tags": [
+    "mmlu_social_sciences_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

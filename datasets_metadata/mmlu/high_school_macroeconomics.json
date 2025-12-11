@@ -1,0 +1,25 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/mmlu/high_school_macroeconomics",
+  "is_local": true,
+  "splits": [
+    "test",
+    "validation",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 390,
+    "validation": 43,
+    "dev": 5
+  },
+  "path": "cais/mmlu",
+  "config_name": "high_school_macroeconomics",
+  "task_name": "mmlu_high_school_macroeconomics_generative",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/mmlu/generative/mmlu_high_school_macroeconomics.yaml",
+  "tags": [
+    "mmlu_social_sciences_generative"
+  ],
+  "category": "多任务理解",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

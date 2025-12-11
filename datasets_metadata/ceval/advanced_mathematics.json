@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/advanced_mathematics",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 173,
+    "val": 19,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "advanced_mathematics",
+  "task_name": "ceval-valid_advanced_mathematics",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_advanced_mathematics.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

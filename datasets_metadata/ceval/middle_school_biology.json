@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/middle_school_biology",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 192,
+    "val": 21,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "middle_school_biology",
+  "task_name": "ceval-valid_middle_school_biology",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_middle_school_biology.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/mao_zedong_thought",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 219,
+    "val": 24,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "mao_zedong_thought",
+  "task_name": "ceval-valid_mao_zedong_thought",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_mao_zedong_thought.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}

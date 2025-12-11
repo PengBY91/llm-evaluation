@@ -1,0 +1,21 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/triviaqa/rc.nocontext",
+  "is_local": true,
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 17944,
+    "test": 17210
+  },
+  "path": "trivia_qa",
+  "config_name": "rc.nocontext",
+  "task_name": "triviaqa",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/triviaqa/default.yaml",
+  "tags": [],
+  "category": "问答",
+  "task_metadata": {
+    "version": 3.0
+  }
+}

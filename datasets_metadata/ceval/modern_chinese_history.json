@@ -1,0 +1,23 @@
+{
+  "local_path": "/home/steve/LLM/lm-evaluation-harness/data/ceval/modern_chinese_history",
+  "is_local": true,
+  "splits": [
+    "test",
+    "val",
+    "dev"
+  ],
+  "num_examples": {
+    "test": 212,
+    "val": 23,
+    "dev": 5
+  },
+  "path": "ceval/ceval-exam",
+  "config_name": "modern_chinese_history",
+  "task_name": "ceval-valid_modern_chinese_history",
+  "yaml_path": "/home/steve/LLM/lm-evaluation-harness/lm_eval/tasks/ceval/ceval-valid_modern_chinese_history.yaml",
+  "tags": [],
+  "category": "中文评测",
+  "task_metadata": {
+    "version": 2.0
+  }
+}
