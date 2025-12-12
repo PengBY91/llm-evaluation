@@ -144,18 +144,22 @@
             filterable
             @visible-change="handleTaskSelectVisible"
             @focus="handleTaskSelectFocus"
-            value-key="name"
+            :value-key="getDatasetUniqueKey"
           >
             <el-option 
               v-for="dataset in availableTasks" 
-              :key="dataset.name" 
+              :key="getDatasetUniqueKey(dataset)" 
               :label="dataset.name" 
               :value="dataset"
             >
               <div>
-                <div>{{ dataset.name }}</div>
-                <div style="font-size: 12px; color: #999;" v-if="dataset.path">
-                  {{ dataset.path }}{{ dataset.config_name ? ` (${dataset.config_name})` : '' }}
+                <div>
+                  <strong>{{ dataset.name }}</strong>
+                </div>
+                <div style="font-size: 12px; color: #999;" v-if="dataset.source || dataset.config_name">
+                  <span v-if="dataset.source">来源: {{ dataset.source }}</span>
+                  <span v-if="dataset.source && dataset.config_name"> · </span>
+                  <span v-if="dataset.config_name">配置: {{ dataset.config_name }}</span>
                 </div>
               </div>
             </el-option>
@@ -253,6 +257,16 @@ const loadingAvailableTasks = ref(false)
 const fixingTaskNames = ref(false)
 
 const selectedModelId = ref(null)
+
+// 生成数据集的唯一键（用于 el-select 的 value-key）
+const getDatasetUniqueKey = (dataset) => {
+  if (!dataset) return ''
+  // 使用 name + config_name 组合作为唯一键（与后端逻辑一致）
+  if (dataset.config_name) {
+    return `${dataset.name}:${dataset.config_name}`
+  }
+  return dataset.name || dataset.task_name || ''
+}
 
 const taskForm = ref({
   name: '',
@@ -666,33 +680,57 @@ const loadAvailableTasks = async () => {
     }
     
     // 过滤并确保所有数据集都有正确的 name 字段
+    // 重要：优先使用 task_name（来自 YAML 的 task 字段），而不是文件夹名称
     const validDatasets = allDatasets
-      .filter(dataset => dataset && (dataset.name || dataset.path))  // 过滤无效数据
+      .filter(dataset => dataset && (dataset.name || dataset.task_name || dataset.path))  // 过滤无效数据
       .map(dataset => {
-        // 确保 name 字段存在（应该从 TaskManager 获取，但如果没有则构造）
-        if (!dataset.name) {
-          // 如果没有 name，则根据路径构造（兼容旧数据）
+        // 重要：优先使用 task_name（来自 YAML 的 task 字段）作为 name
+        // 如果 task_name 存在，使用它作为 name
+        if (dataset.task_name) {
+          dataset.name = dataset.task_name
+        } else if (!dataset.name) {
+          // 如果没有 task_name 也没有 name，则根据路径构造（兼容旧数据）
           let taskName = dataset.path.replace(/\//g, '_')  // 将路径中的 "/" 替换为 "_"
           if (dataset.config_name) {
             taskName = `${taskName}_${dataset.config_name}`
           }
           dataset.name = taskName
         }
+        // 如果 name 存在但不是 task_name，且 task_name 也存在，则使用 task_name
+        // 这个检查是为了确保即使后端返回的 name 是文件夹名称，我们也使用 task_name
+        if (dataset.task_name && dataset.name !== dataset.task_name) {
+          dataset.name = dataset.task_name
+        }
         return dataset
       })
     
-    // 去重（基于 name），保留第一个
+    // 去重（基于 name + config_name 的组合），保留第一个
+    // 注意：同一个数据集的不同配置（如 arc/ARC-Easy 和 arc/ARC-Challenge）应该都显示
     const uniqueDatasets = []
-    const seenNames = new Set()
+    const seenKeys = new Set()
     for (const dataset of validDatasets) {
-      if (!seenNames.has(dataset.name)) {
-        seenNames.add(dataset.name)
+      // 使用 name + config_name 作为唯一键
+      const uniqueKey = dataset.config_name 
+        ? `${dataset.name}:${dataset.config_name}` 
+        : dataset.name
+      
+      if (!seenKeys.has(uniqueKey)) {
+        seenKeys.add(uniqueKey)
         uniqueDatasets.push(dataset)
       }
     }
     
-    // 按名称排序
-    uniqueDatasets.sort((a, b) => a.name.localeCompare(b.name))
+    // 按名称和配置名称排序
+    uniqueDatasets.sort((a, b) => {
+      const nameCompare = a.name.localeCompare(b.name)
+      if (nameCompare !== 0) {
+        return nameCompare
+      }
+      // 如果名称相同，按配置名称排序
+      const configA = a.config_name || ''
+      const configB = b.config_name || ''
+      return configA.localeCompare(configB)
+    })
     
     availableTasks.value = uniqueDatasets
     availableDatasets.value = uniqueDatasets
