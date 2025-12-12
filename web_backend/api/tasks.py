@@ -359,26 +359,63 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         normalized_tasks = request.tasks
     
     # 检查是否有无效的任务名称
-    # 使用 all_tasks（包含 groups + subtasks + tags）进行验证，因为 simple_evaluate 可以接受组名
-    available_tasks = set(task_manager.all_tasks)
+    # 只接受 subtasks 和 groups，不接受 tags（标签不应该作为任务名称）
+    available_tasks = set(task_manager.all_subtasks) | set(task_manager.all_groups)
     invalid_tasks = [t for t in normalized_tasks if t not in available_tasks]
     if invalid_tasks:
-        # 使用 match_tasks 进行更灵活的匹配（支持通配符等）
-        matched_tasks = task_manager.match_tasks(normalized_tasks)
+        # 使用 match_tasks 进行更灵活的匹配（支持通配符等），但只匹配 subtasks 和 groups
+        # 先过滤出只包含 subtasks 和 groups 的任务列表
+        all_valid_tasks = list(task_manager.all_subtasks) + list(task_manager.all_groups)
+        matched_tasks = task_manager.match_tasks([t for t in normalized_tasks if t in all_valid_tasks])
+        # 对于无效的任务，尝试在 subtasks 和 groups 中匹配
+        for invalid_task in invalid_tasks[:]:
+            # 尝试在 subtasks 和 groups 中查找匹配
+            matches = task_manager.match_tasks([invalid_task])
+            valid_matches = [m for m in matches if m in available_tasks]
+            if valid_matches:
+                matched_tasks.extend(valid_matches)
+                invalid_tasks.remove(invalid_task)
+        
         still_invalid = [t for t in invalid_tasks if t not in matched_tasks]
         
         if still_invalid:
+            # 尝试查找相似的任务名称（用于提供更好的错误提示）
+            similar_tasks = []
+            for invalid_task in still_invalid:
+                # 查找包含该名称的任务（只在 subtasks 和 groups 中查找）
+                similar = [t for t in available_tasks if invalid_task.lower() in t.lower() or t.lower() in invalid_task.lower()]
+                if similar:
+                    similar_tasks.extend(similar[:3])  # 每个无效任务最多显示3个相似任务
+            
             # 提供更友好的错误信息
-            error_msg = f"以下任务名称无效或不存在: {', '.join(still_invalid)}。\n"
-            error_msg += "这可能是因为数据集没有对应的任务名称（task_name）。\n"
-            error_msg += "请确保选择的数据集在 TaskManager 中有对应的任务定义。\n"
+            error_msg = f"以下任务名称无效或不存在: {', '.join(still_invalid)}。\n\n"
+            error_msg += "这可能是因为：\n"
+            error_msg += "1. 数据集没有对应的任务名称（task_name）\n"
+            error_msg += "2. 任务名称拼写错误\n"
+            error_msg += "3. 使用了文件夹名称或标签而不是任务名称\n"
+            error_msg += "4. 使用了标签（tags）而不是任务名称（tags 不能直接作为任务名称使用）\n\n"
             error_msg += "提示：可以使用的任务类型包括：\n"
             error_msg += f"- 独立任务（subtasks）: {len(task_manager.all_subtasks)} 个\n"
             error_msg += f"- 任务组（groups）: {len(task_manager.all_groups)} 个\n"
+            error_msg += "注意：标签（tags）不能直接作为任务名称使用\n\n"
+            
+            if similar_tasks:
+                error_msg += f"相似的任务名称: {', '.join(set(similar_tasks)[:10])}\n\n"
+            
             if task_manager.all_groups:
-                error_msg += f"可用任务组示例: {', '.join(list(task_manager.all_groups)[:5])}...\n"
+                error_msg += f"可用任务组示例: {', '.join(list(task_manager.all_groups)[:5])}\n"
             if task_manager.all_subtasks:
-                error_msg += f"可用独立任务示例: {', '.join(list(task_manager.all_subtasks)[:5])}..."
+                # 查找与无效任务相关的子任务
+                related_subtasks = []
+                for invalid_task in still_invalid:
+                    related = [t for t in task_manager.all_subtasks if invalid_task.lower() in t.lower()]
+                    if related:
+                        related_subtasks.extend(related[:3])
+                if related_subtasks:
+                    error_msg += f"相关独立任务: {', '.join(set(related_subtasks)[:5])}"
+                else:
+                    error_msg += f"可用独立任务示例: {', '.join(list(task_manager.all_subtasks)[:5])}"
+            
             raise HTTPException(
                 status_code=400,
                 detail=error_msg

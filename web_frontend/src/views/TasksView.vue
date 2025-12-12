@@ -155,7 +155,10 @@
             >
               <div>
                 <div>{{ getDatasetLabel(dataset) }}</div>
-                <div style="font-size: 12px; color: #999;" v-if="dataset.path">
+                <div style="font-size: 12px; color: #999;" v-if="dataset.task_name">
+                  任务: {{ dataset.task_name }}
+                </div>
+                <div style="font-size: 12px; color: #999;" v-else-if="dataset.path">
                   {{ dataset.path }}
                 </div>
               </div>
@@ -440,35 +443,49 @@ const createTask = async () => {
     }
     
     // 将选择的数据集对象转换为任务创建请求格式
-    // 如果 tasks 是数据集对象数组，优先使用 task_name（如果存在），否则使用 name
-    const taskNames = taskForm.value.tasks.map(task => {
+    // 验证并提取 task_name（必须存在，否则无法创建任务）
+    const taskNames = []
+    const datasetInfos = []
+    
+    for (const task of taskForm.value.tasks) {
       if (typeof task === 'object' && task !== null) {
-        // 数据集对象，优先使用 task_name（从 TaskManager 获取的正确任务名称）
-        // 如果没有 task_name，提示用户
+        // 数据集对象，必须要有 task_name（从 TaskManager 获取的正确任务名称）
         if (!task.task_name) {
-          ElMessage.warning(`数据集 "${task.name}" 没有对应的任务名称（task_name），可能无法创建任务。请确保该数据集在 TaskManager 中有对应的任务定义。`)
+          ElMessage.error(`数据集 "${task.name}" 没有对应的任务名称（task_name），无法创建任务。请确保该数据集在 TaskManager 中有对应的任务定义。`)
+          return  // 如果缺少 task_name，直接返回，不创建任务
         }
-        return task.task_name || task.name
+        
+        // 使用 task_name 作为任务名称
+        taskNames.push(task.task_name)
+        
+        // 构建完整的数据集信息，包含所有必要字段
+        datasetInfos.push({
+          name: task.name || task.task_name,  // 数据集显示名称（来自 YAML 配置中的 task 字段）
+          task_name: task.task_name,  // 正确的任务名称（从 TaskManager 获取，用于评测）- 必需
+          path: task.path || '',  // 数据集路径
+          config_name: task.config_name || null  // 配置名称
+        })
       } else if (typeof task === 'string') {
-        // 字符串（兼容旧代码）
-        return task
+        // 字符串（兼容旧代码，但不推荐）
+        taskNames.push(task)
+        ElMessage.warning('检测到字符串格式的任务名称，建议使用数据集对象格式以确保正确性')
       } else {
-        throw new Error('无效的任务格式')
+        ElMessage.error('无效的任务格式')
+        return
       }
-    })
+    }
+    
+    // 验证是否至少有一个任务
+    if (taskNames.length === 0) {
+      ElMessage.error('请至少选择一个数据集')
+      return
+    }
     
     // 构建请求数据，包含数据集信息
     const requestData = {
       ...taskForm.value,
-      tasks: taskNames,  // 使用正确的任务名称（优先 task_name）
-      datasets: taskForm.value.tasks
-        .filter(task => typeof task === 'object' && task !== null)
-        .map(task => ({
-          name: task.name,  // 数据集显示名称（来自 YAML 配置中的 task 字段）
-          task_name: task.task_name,  // 正确的任务名称（从 TaskManager 获取，用于评测）
-          path: task.path,
-          config_name: task.config_name
-        }))
+      tasks: taskNames,  // 使用正确的任务名称（task_name）
+      datasets: datasetInfos  // 完整的数据集信息
     }
     
     // 如果提供了 model_id，清空 model_args（让后端自动构建）
@@ -728,20 +745,25 @@ const loadAvailableTasks = async () => {
     }
     
     // 过滤并确保所有数据集都有正确的 name 字段和唯一键
+    // 重要：只保留有 task_name 的数据集（task_name 是必需的，用于创建任务）
     const validDatasets = allDatasets
-      .filter(dataset => dataset && (dataset.name || dataset.task_name || dataset.path))  // 过滤无效数据
+      .filter(dataset => {
+        // 过滤无效数据，并且必须有 task_name（用于创建任务）
+        if (!dataset || (!dataset.name && !dataset.task_name && !dataset.path)) {
+          return false
+        }
+        // 必须有 task_name，否则无法创建任务
+        if (!dataset.task_name) {
+          console.warn(`数据集 "${dataset.name || dataset.path}" 没有 task_name，将被过滤掉`)
+          return false
+        }
+        return true
+      })
       .map(dataset => {
-        // 重要：优先使用 task_name（来自 YAML 的 task 字段）作为 name
-        // 如果 task_name 存在，使用它作为 name
-        if (dataset.task_name) {
+        // 确保 name 字段存在（用于显示）
+        if (!dataset.name) {
+          // 如果没有 name，使用 task_name 作为显示名称
           dataset.name = dataset.task_name
-        } else if (!dataset.name) {
-          // 如果没有 task_name 也没有 name，则根据路径构造（兼容旧数据）
-          let taskName = dataset.path.replace(/\//g, '_')  // 将路径中的 "/" 替换为 "_"
-          if (dataset.config_name) {
-            taskName = `${taskName}_${dataset.config_name}`
-          }
-          dataset.name = taskName
         }
         // 添加唯一键字段（用于 value-key 和去重）
         dataset.uniqueKey = getDatasetUniqueKey(dataset)
