@@ -257,6 +257,16 @@ const taskFilterKeyword = ref('')  // 用于存储过滤关键词
 
 const selectedModelId = ref(null)
 
+// 生成数据集的唯一键（用于 el-select 的 value-key）
+const getDatasetUniqueKey = (dataset) => {
+  if (!dataset) return ''
+  // 使用 name + config_name 组合作为唯一键（与后端逻辑一致）
+  if (dataset.config_name) {
+    return `${dataset.name}:${dataset.config_name}`
+  }
+  return dataset.name || dataset.task_name || ''
+}
+
 const taskForm = ref({
   name: '',
   model: 'openai-chat-completions',
@@ -719,11 +729,14 @@ const loadAvailableTasks = async () => {
     
     // 过滤并确保所有数据集都有正确的 name 字段和唯一键
     const validDatasets = allDatasets
-      .filter(dataset => dataset && (dataset.name || dataset.path))  // 过滤无效数据
+      .filter(dataset => dataset && (dataset.name || dataset.task_name || dataset.path))  // 过滤无效数据
       .map(dataset => {
-        // 确保 name 字段存在（应该从 TaskManager 获取，但如果没有则构造）
-        if (!dataset.name) {
-          // 如果没有 name，则根据路径构造（兼容旧数据）
+        // 重要：优先使用 task_name（来自 YAML 的 task 字段）作为 name
+        // 如果 task_name 存在，使用它作为 name
+        if (dataset.task_name) {
+          dataset.name = dataset.task_name
+        } else if (!dataset.name) {
+          // 如果没有 task_name 也没有 name，则根据路径构造（兼容旧数据）
           let taskName = dataset.path.replace(/\//g, '_')  // 将路径中的 "/" 替换为 "_"
           if (dataset.config_name) {
             taskName = `${taskName}_${dataset.config_name}`
@@ -731,7 +744,7 @@ const loadAvailableTasks = async () => {
           dataset.name = taskName
         }
         // 添加唯一键字段（用于 value-key 和去重）
-        dataset.uniqueKey = getDatasetKey(dataset)
+        dataset.uniqueKey = getDatasetUniqueKey(dataset)
         return dataset
       })
     

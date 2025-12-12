@@ -3,6 +3,10 @@
     <div class="view-header">
       <h2>数据集管理</h2>
       <div class="header-actions">
+        <el-button @click="fixTaskNames" :loading="fixingTaskNames" type="warning" style="margin-right: 10px;">
+          <el-icon><Tools /></el-icon>
+          修复任务名称
+        </el-button>
         <el-button @click="refreshCache" :loading="refreshing">
           <el-icon><Refresh /></el-icon>
           刷新缓存
@@ -59,10 +63,27 @@
     </div>
 
     <el-table :data="datasets" v-loading="loading" stripe>
-      <el-table-column prop="name" label="数据集名称" width="250" show-overflow-tooltip />
-      <el-table-column prop="config_name" label="配置名称" width="150">
+      <el-table-column prop="name" label="任务名称" width="280" show-overflow-tooltip>
         <template #default="{ row }">
-          <span v-if="row.config_name">{{ row.config_name }}</span>
+          <div>
+            <div style="font-weight: 500;">{{ row.task || row.name }}</div>
+            <div style="font-size: 12px; color: #999; margin-top: 4px;" v-if="row.source || row.config_name">
+              <span v-if="row.source">来源: {{ row.source }}</span>
+              <span v-if="row.source && row.config_name"> · </span>
+              <span v-if="row.config_name">配置: {{ row.config_name }}</span>
+            </div>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="task_name" label="任务标识" width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.task_name" style="font-family: monospace; font-size: 12px;">{{ row.task_name }}</span>
+          <span v-else style="color: #999;">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="path" label="数据集路径" width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.path" style="font-family: monospace; font-size: 12px; color: #666;">{{ row.path }}</span>
           <span v-else style="color: #999;">-</span>
         </template>
       </el-table-column>
@@ -154,10 +175,18 @@
     >
       <div v-if="currentDataset">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="数据集名称">{{ currentDataset.name }}</el-descriptions-item>
-          <el-descriptions-item label="路径">{{ currentDataset.path }}</el-descriptions-item>
+          <el-descriptions-item label="任务名称">{{ currentDataset.task || currentDataset.name }}</el-descriptions-item>
+          <el-descriptions-item label="任务标识">
+            <span v-if="currentDataset.task_name" style="font-family: monospace; font-size: 12px;">{{ currentDataset.task_name }}</span>
+            <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="数据集来源">{{ currentDataset.source || '-' }}</el-descriptions-item>
           <el-descriptions-item label="配置名称">
             {{ currentDataset.config_name || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="数据集路径">
+            <span v-if="currentDataset.path" style="font-family: monospace; font-size: 12px;">{{ currentDataset.path }}</span>
+            <span v-else>-</span>
           </el-descriptions-item>
           <el-descriptions-item label="类别">
             <el-tag v-if="currentDataset.category" size="small">{{ currentDataset.category }}</el-tag>
@@ -257,7 +286,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Tools } from '@element-plus/icons-vue'
 import { datasetsApi } from '../api/datasets'
 
 const datasets = ref([])
@@ -267,6 +296,7 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const refreshing = ref(false)
+const fixingTaskNames = ref(false)
 const showAddDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentDataset = ref(null)
@@ -417,6 +447,37 @@ const refreshCache = async () => {
     ElMessage.error('刷新缓存失败: ' + error.message)
   } finally {
     refreshing.value = false
+  }
+}
+
+const fixTaskNames = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '此操作将修复所有已保存的数据集元数据中的任务名称（从 YAML 文件重新读取 task 字段）。是否继续？',
+      '确认修复',
+      {
+        type: 'warning',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消'
+      }
+    )
+    
+    fixingTaskNames.value = true
+    const response = await datasetsApi.fixTaskNames()
+    
+    if (response.fixed_count > 0) {
+      ElMessage.success(`成功修复 ${response.fixed_count} 个数据集的任务名称`)
+      // 重新加载数据集列表
+      loadDatasets()
+    } else {
+      ElMessage.info('未发现需要修复的数据集')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('修复任务名称失败: ' + (error.message || '未知错误'))
+    }
+  } finally {
+    fixingTaskNames.value = false
   }
 }
 

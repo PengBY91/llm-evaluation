@@ -52,10 +52,12 @@ class DatasetAddRequest(BaseModel):
 
 class DatasetResponse(BaseModel):
     """数据集响应"""
-    name: str  # 数据集名称（来自 YAML 配置中的 task 字段）
-    path: str  # 数据集路径（HuggingFace 路径）
-    config_name: Optional[str] = None  # 配置名称（子文件夹名称）
-    task_name: Optional[str] = None  # 任务名称（从 TaskManager 获取，用于评测）
+    name: str  # 数据集名称（使用 YAML 的 task 字段，如果不存在则使用 task_name 或 path+config_name）
+    path: str  # 数据集路径（HuggingFace 路径，原始来源）
+    config_name: Optional[str] = None  # 配置名称（子文件夹名称，原始来源）
+    task_name: Optional[str] = None  # 任务名称（从 YAML 的 task 字段获取，用于评测和显示）
+    task: Optional[str] = None  # 任务名称（从 YAML 的 task 字段获取，用于显示）
+    source: Optional[str] = None  # 数据集来源（文件夹名称）
     description: Optional[str] = None
     local_path: Optional[str] = None
     is_local: bool
@@ -118,9 +120,10 @@ def load_dataset_metadata(dataset_path: str, config_name: Optional[str] = None) 
 
 
 def load_all_datasets_metadata() -> Dict[str, Dict[str, Any]]:
-    """从文件加载所有数据集元数据"""
+    """从文件加载所有数据集元数据（包括子目录中的文件）"""
     metadata_dict = {}
-    for metadata_file in DATASETS_METADATA_DIR.glob("*.json"):
+    # 递归查找所有 JSON 文件
+    for metadata_file in DATASETS_METADATA_DIR.rglob("*.json"):
         try:
             with open(metadata_file, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
@@ -142,6 +145,110 @@ def delete_dataset_metadata(dataset_path: str, config_name: Optional[str] = None
             metadata_file.unlink()
         except Exception as e:
             print(f"删除数据集元数据文件失败 {dataset_path}/{config_name}: {e}")
+
+
+def find_task_from_yaml(dataset_path: str, config_name: Optional[str] = None) -> Optional[str]:
+    """从 YAML 任务文件中查找并读取 task 字段
+    
+    Args:
+        dataset_path: 数据集路径（文件夹名称，可能包含下划线）
+        config_name: 配置名称（子文件夹名称）
+    
+    Returns:
+        task 字段的值，如果找不到则返回 None
+    """
+    try:
+        from lm_eval import utils
+        from pathlib import Path
+        
+        # 获取任务目录路径
+        tasks_dir = Path(__file__).parent.parent.parent / "lm_eval" / "tasks"
+        if not tasks_dir.exists():
+            return None
+        
+        # 将数据集路径转换为可能的任务目录名称
+        # 例如：cais_mmlu -> mmlu, gsm8k -> gsm8k
+        # 支持多种格式：下划线分隔、斜杠分隔等
+        possible_task_dirs = []
+        
+        # 如果包含下划线，尝试移除前缀（如 cais_mmlu -> mmlu）
+        if "_" in dataset_path:
+            parts = dataset_path.split("_")
+            # 尝试不同的组合
+            for i in range(len(parts)):
+                possible_task_dirs.append("_".join(parts[i:]))
+        else:
+            possible_task_dirs.append(dataset_path)
+        
+        # 也尝试将下划线转换为斜杠（如 cais_mmlu -> cais/mmlu）
+        if "_" in dataset_path:
+            possible_task_dirs.append(dataset_path.replace("_", "/"))
+        
+        # 在任务目录中查找匹配的 YAML 文件
+        for task_dir_name in possible_task_dirs:
+            task_dir = tasks_dir / task_dir_name
+            if not task_dir.exists() or not task_dir.is_dir():
+                continue
+            
+            # 查找该目录下的所有 YAML 文件
+            yaml_files = list(task_dir.glob("*.yaml"))
+            # 也查找子目录中的 YAML 文件
+            for subdir in task_dir.iterdir():
+                if subdir.is_dir() and not subdir.name.startswith("_"):
+                    yaml_files.extend(subdir.glob("*.yaml"))
+            
+            for yaml_file in yaml_files:
+                # 跳过以 _ 开头的文件（通常是模板文件）
+                if yaml_file.name.startswith("_"):
+                    continue
+                
+                try:
+                    config = utils.load_yaml_config(str(yaml_file), mode="simple")
+                    
+                    # 检查是否是组配置文件（有 group 字段）
+                    if "group" in config:
+                        continue
+                    
+                    # 检查 dataset_path 和 dataset_name 是否匹配
+                    yaml_dataset_path = config.get("dataset_path")
+                    yaml_dataset_name = config.get("dataset_name")
+                    
+                    # 匹配 dataset_path（支持斜杠和下划线的转换）
+                    path_matches = False
+                    if yaml_dataset_path:
+                        path_matches = (
+                            yaml_dataset_path == dataset_path or
+                            yaml_dataset_path.replace("/", "_") == dataset_path or
+                            yaml_dataset_path == dataset_path.replace("_", "/")
+                        )
+                    
+                    # 匹配 config_name（dataset_name）
+                    config_matches = False
+                    if config_name is None and yaml_dataset_name is None:
+                        config_matches = True
+                    elif config_name is not None and yaml_dataset_name is not None:
+                        config_matches = (config_name == yaml_dataset_name)
+                    elif config_name == "all":
+                        # "all" 配置可以匹配任何 dataset_name
+                        config_matches = True
+                    
+                    if path_matches and config_matches:
+                        # 找到匹配的 YAML 文件，读取 task 字段
+                        task_field = config.get("task")
+                        if task_field:
+                            # task 字段可能是字符串或列表
+                            if isinstance(task_field, list):
+                                return task_field[0] if task_field else None
+                            else:
+                                return task_field
+                except Exception:
+                    # 如果读取 YAML 文件失败，继续查找下一个
+                    continue
+        
+        return None
+    except Exception:
+        # 如果出现任何错误，返回 None
+        return None
 
 
 def infer_category(dataset_path: str, task_name: Optional[str] = None, tags: Optional[List[str]] = None) -> str:
@@ -222,12 +329,17 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                 # 数据集加载失败，但仍然添加到列表中（可能数据集文件损坏，但可以从 TaskManager 匹配 task_name）
                                 pass
                             
+                            # 尝试直接从 YAML 文件中读取 task 字段
+                            task_from_yaml = find_task_from_yaml(dataset_path, config_name)
+                            
                             # 创建数据集对象
                             dataset_info = {
-                                "name": dataset_name,  # 初始值，后续将从 YAML 配置中的 task 字段更新
+                                "name": task_from_yaml or dataset_name,  # 优先使用 YAML 的 task 字段，否则使用文件夹名称
                                 "path": dataset_path,  # 保持原样，用于匹配 TaskManager
                                 "config_name": config_name,
                                 "task_name": None,  # 稍后从 TaskManager 获取
+                                "task": task_from_yaml,  # 从 YAML 的 task 字段获取
+                                "source": dataset_name,  # 数据集来源（文件夹名称）
                                 "local_path": str(config_dir),
                                 "is_local": True,
                                 "splits": splits,
@@ -237,9 +349,26 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             }
                             
                             # 合并已保存的元数据（如果存在）
+                            # 尝试多种键格式来匹配元数据
                             metadata_key = f"{dataset_path}:{config_name}"
+                            saved_meta = None
+                            
+                            # 首先尝试使用文件夹名称作为键
                             if metadata_key in saved_metadata:
                                 saved_meta = saved_metadata[metadata_key]
+                            else:
+                                # 如果找不到，尝试通过 local_path 匹配元数据文件
+                                # 从元数据文件中查找匹配的 local_path（使用绝对路径比较）
+                                config_dir_abs = str(Path(config_dir).absolute())
+                                for meta_key, meta_data in saved_metadata.items():
+                                    meta_local_path = meta_data.get("local_path")
+                                    if meta_local_path:
+                                        # 转换为绝对路径进行比较
+                                        if Path(meta_local_path).absolute() == Path(config_dir_abs):
+                                            saved_meta = meta_data
+                                            break
+                            
+                            if saved_meta:
                                 # 合并元数据，已保存的优先级更高
                                 if "description" in saved_meta:
                                     dataset_info["description"] = saved_meta["description"]
@@ -247,6 +376,23 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     dataset_info["category"] = saved_meta["category"]
                                 if "tags" in saved_meta:
                                     dataset_info["tags"] = saved_meta["tags"]
+                                # 重要：从元数据文件中获取 task_name（如果存在）
+                                if "task_name" in saved_meta and saved_meta["task_name"]:
+                                    dataset_info["task_name"] = saved_meta["task_name"]
+                                # 如果元数据中有 path，使用它（HuggingFace 路径）
+                                if "path" in saved_meta and saved_meta["path"]:
+                                    dataset_info["path"] = saved_meta["path"]
+                            
+                            # 如果元数据中有 task 字段，使用它（优先级高于直接从 YAML 读取的）
+                            if saved_meta and "task" in saved_meta and saved_meta["task"]:
+                                dataset_info["task"] = saved_meta["task"]
+                                dataset_info["name"] = saved_meta["task"]
+                            
+                            # 重要：优先使用 task 字段作为 name（如果存在），否则使用 task_name
+                            if dataset_info.get("task"):
+                                dataset_info["name"] = dataset_info["task"]
+                            elif dataset_info.get("task_name"):
+                                dataset_info["name"] = dataset_info["task_name"]
                             
                             datasets.append(dataset_info)
                     else:
@@ -265,12 +411,17 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             # 数据集加载失败，但仍然添加到列表中（可能数据集文件损坏，但可以从 TaskManager 匹配 task_name）
                             pass
                         
+                        # 尝试直接从 YAML 文件中读取 task 字段
+                        task_from_yaml = find_task_from_yaml(dataset_path, None)
+                        
                         # 创建数据集对象
                         dataset_info = {
-                            "name": dataset_name,  # 初始值，后续将从 YAML 配置中的 task 字段更新
+                            "name": task_from_yaml or dataset_name,  # 优先使用 YAML 的 task 字段，否则使用文件夹名称
                             "path": dataset_path,  # 保持原样，用于匹配 TaskManager
                             "config_name": None,
                             "task_name": None,  # 稍后从 TaskManager 获取
+                            "task": task_from_yaml,  # 从 YAML 的 task 字段获取
+                            "source": dataset_name,  # 数据集来源（文件夹名称）
                             "local_path": str(dataset_dir),
                             "is_local": True,
                             "splits": splits,
@@ -281,8 +432,23 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                         
                         # 合并已保存的元数据（如果存在）
                         metadata_key = dataset_path
+                        saved_meta = None
+                        
+                        # 首先尝试使用文件夹名称作为键
                         if metadata_key in saved_metadata:
                             saved_meta = saved_metadata[metadata_key]
+                        else:
+                            # 如果找不到，尝试通过 local_path 匹配元数据文件（使用绝对路径比较）
+                            dataset_dir_abs = str(Path(dataset_dir).absolute())
+                            for meta_key, meta_data in saved_metadata.items():
+                                meta_local_path = meta_data.get("local_path")
+                                if meta_local_path:
+                                    # 转换为绝对路径进行比较
+                                    if Path(meta_local_path).absolute() == Path(dataset_dir_abs):
+                                        saved_meta = meta_data
+                                        break
+                        
+                        if saved_meta:
                             # 合并元数据，已保存的优先级更高
                             if "description" in saved_meta:
                                 dataset_info["description"] = saved_meta["description"]
@@ -290,6 +456,23 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                 dataset_info["category"] = saved_meta["category"]
                             if "tags" in saved_meta:
                                 dataset_info["tags"] = saved_meta["tags"]
+                            # 重要：从元数据文件中获取 task_name（如果存在）
+                            if "task_name" in saved_meta and saved_meta["task_name"]:
+                                dataset_info["task_name"] = saved_meta["task_name"]
+                            # 如果元数据中有 path，使用它（HuggingFace 路径）
+                            if "path" in saved_meta and saved_meta["path"]:
+                                dataset_info["path"] = saved_meta["path"]
+                        
+                        # 如果元数据中有 task 字段，使用它（优先级高于直接从 YAML 读取的）
+                        if saved_meta and "task" in saved_meta and saved_meta["task"]:
+                            dataset_info["task"] = saved_meta["task"]
+                            dataset_info["name"] = saved_meta["task"]
+                        
+                        # 重要：优先使用 task 字段作为 name（如果存在），否则使用 task_name
+                        if dataset_info.get("task"):
+                            dataset_info["name"] = dataset_info["task"]
+                        elif dataset_info.get("task_name"):
+                            dataset_info["name"] = dataset_info["task_name"]
                         
                         datasets.append(dataset_info)
         
@@ -333,11 +516,14 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                         config = utils.load_yaml_config(yaml_path, mode="simple")
                         dataset_path = config.get("dataset_path")
                         
-                        # 获取 task 字段作为数据集名称（对于独立任务，这是字符串）
-                        task_name_from_config = config.get("task")
-                        # 如果 task 是列表（不应该在独立任务中出现），取第一个
-                        if isinstance(task_name_from_config, list):
-                            task_name_from_config = task_name_from_config[0] if task_name_from_config else None
+                        # 从 YAML 配置文件中读取 task 字段
+                        task_field = config.get("task")
+                        # task 字段可能是字符串或列表
+                        if isinstance(task_field, list):
+                            # 如果是列表，使用第一个元素（通常是主任务名称）
+                            task_from_yaml = task_field[0] if task_field else None
+                        else:
+                            task_from_yaml = task_field
                         
                         if dataset_path:
                             dataset_name = config.get("dataset_name")
@@ -396,18 +582,28 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     break
                             
                             if existing_index is not None:
-                                # 如果已存在，更新 task_name 字段（从 TaskManager 获取），并补充其他信息
+                                # 如果已存在，更新 task_name 和 task 字段（从 TaskManager 和 YAML 获取），并补充其他信息
                                 existing_dataset = datasets[existing_index]
-                                # 更新数据集名称：使用 YAML 配置中的 task 字段
-                                if task_name_from_config:
-                                    existing_dataset["name"] = task_name_from_config
+                                # 重要：如果 task_name 已经从元数据文件中获取，不要被 TaskManager 覆盖
+                                # 只有在 task_name 为 None 时才从 TaskManager 设置
                                 # 更新 task_name 字段为正确的任务名称（从 TaskManager 获取，用于评测）
                                 # 注意：如果 config_name 是 "all"，可能需要匹配多个任务，这里优先匹配 dataset_name 为 None 的任务
                                 if existing_dataset.get("task_name") is None:
                                     existing_dataset["task_name"] = best_match_task_name or task_name
                                 # 如果 config_name 是 "all" 且当前任务的 dataset_name 为 None，优先使用它
-                                elif existing_dataset.get("config_name") == "all" and dataset_name is None:
+                                # 但前提是 task_name 还没有从元数据文件中获取
+                                elif existing_dataset.get("config_name") == "all" and dataset_name is None and existing_dataset.get("task_name") is None:
                                     existing_dataset["task_name"] = task_name
+                                
+                                # 从 YAML 配置文件中读取 task 字段（用于显示）
+                                if task_from_yaml and existing_dataset.get("task") is None:
+                                    existing_dataset["task"] = task_from_yaml
+                                
+                                # 重要：优先使用 task 字段作为 name（如果存在），否则使用 task_name
+                                if existing_dataset.get("task"):
+                                    existing_dataset["name"] = existing_dataset["task"]
+                                elif existing_dataset.get("task_name"):
+                                    existing_dataset["name"] = existing_dataset["task_name"]
                                 # 更新其他可能缺失的字段
                                 if not existing_dataset.get("splits") or not existing_dataset.get("num_examples"):
                                     # 注意：dataset_path 可能使用斜杠（如 cais/mmlu），需要转换为下划线格式来匹配本地路径
@@ -483,10 +679,12 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                 
                                 # 创建数据集对象
                                 dataset_info = {
-                                    "name": dataset_display_name,  # 使用 YAML 配置中的 task 字段作为数据集名称
+                                    "name": display_name,  # 临时使用文件夹名称，稍后会替换为 task 或 task_name
                                     "path": dataset_path,  # 保持原始路径（可能包含斜杠，用于匹配）
                                     "config_name": dataset_name,
                                     "task_name": task_name,  # 从 TaskManager 获取的任务名称（用于评测）
+                                    "task": task_from_yaml,  # 从 YAML 的 task 字段获取（用于显示）
+                                    "source": display_name,  # 数据集来源（文件夹名称）
                                     "description": f"Task: {task_name}",
                                     "local_path": str(local_path) if is_local else None,
                                     "is_local": is_local,
@@ -495,6 +693,12 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     "category": infer_category(dataset_path, task_name, tags),
                                     "tags": tags
                                 }
+                                
+                                # 优先使用 task 字段作为 name（如果存在），否则使用 task_name
+                                if task_from_yaml:
+                                    dataset_info["name"] = task_from_yaml
+                                elif task_name:
+                                    dataset_info["name"] = task_name
                                 
                                 # 合并已保存的元数据（如果存在）
                                 metadata_key = f"{dataset_path}:{dataset_name}" if dataset_name else dataset_path
@@ -507,6 +711,16 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                         dataset_info["category"] = saved_meta["category"]
                                     if "tags" in saved_meta:
                                         dataset_info["tags"] = saved_meta["tags"]
+                                    # 重要：从元数据文件中获取 task_name（如果存在）
+                                    if "task_name" in saved_meta and saved_meta["task_name"]:
+                                        dataset_info["task_name"] = saved_meta["task_name"]
+                                
+                                # 重要：优先使用 task 字段作为 name（如果存在），否则使用 task_name
+                                # 注意：task 字段会在后续从 TaskManager 匹配时设置
+                                if dataset_info.get("task"):
+                                    dataset_info["name"] = dataset_info["task"]
+                                elif dataset_info.get("task_name"):
+                                    dataset_info["name"] = dataset_info["task_name"]
                                 
                                 datasets.append(dataset_info)
                     except Exception:
@@ -620,23 +834,45 @@ def load_all_datasets() -> List[Dict[str, Any]]:
             pass
         
         # 确保所有数据集都有 name 字段（应该已经有了，但为了安全起见）
-        # 如果 name 为 None，使用 task_name（从 TaskManager 获取的任务名称）作为后备
-        # 如果 task_name 也没有，则使用 path（将斜杠转换为下划线）作为最后的后备
+        # 优先使用 task_name，如果不存在则使用 path+config_name
         for dataset in datasets:
             if dataset.get("name") is None:
                 # 优先使用 task_name
                 if dataset.get("task_name"):
                     dataset["name"] = dataset["task_name"]
                 else:
-                    # 如果 task_name 也没有，使用 path 作为后备
+                    # 如果没有 task_name，使用 path+config_name
                     path_name = dataset.get("path", "").replace("/", "_")  # 将斜杠转换为下划线
                     if dataset.get("config_name"):
                         dataset["name"] = f"{path_name}_{dataset['config_name']}"
                     else:
                         dataset["name"] = path_name
+            # 如果 name 存在但不是 task_name，且 task_name 也存在，则使用 task_name
+            elif dataset.get("task_name") and dataset.get("name") != dataset.get("task_name"):
+                dataset["name"] = dataset["task_name"]
         
         _datasets_cache = datasets
         return datasets
+
+
+@router.post("/fix-task-names")
+async def fix_task_names():
+    """修复已保存的数据集元数据中的任务名称（从 YAML 文件重新读取 task 字段）"""
+    try:
+        result = fix_dataset_task_names()
+        # 清除缓存，强制重新加载
+        global _datasets_cache
+        with _cache_lock:
+            _datasets_cache = None
+        # 重新加载数据集
+        load_all_datasets()
+        return result
+    except Exception as e:
+        return {
+            "fixed_count": 0,
+            "error_count": 1,
+            "message": f"修复失败: {str(e)}"
+        }
 
 
 @router.get("/", response_model=DatasetListResponse)
@@ -684,6 +920,65 @@ async def list_datasets(
         page_size=page_size,
         categories=categories
     )
+
+
+def fix_dataset_task_names():
+    """修复已保存的数据集元数据中的任务名称（从 YAML 文件重新读取 task 字段）"""
+    fixed_count = 0
+    error_count = 0
+    
+    # 遍历所有已保存的元数据文件
+    for metadata_file in DATASETS_METADATA_DIR.rglob("*.json"):
+        try:
+            # 读取元数据
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+            
+            # 获取数据集路径和配置名称
+            dataset_path = metadata.get("path", "")
+            config_name = metadata.get("config_name")
+            
+            if not dataset_path:
+                # 如果没有 path，尝试从文件名推断
+                file_name = metadata_file.stem
+                # 文件名格式可能是 path_config_name 或 path
+                if "_" in file_name:
+                    parts = file_name.rsplit("_", 1)
+                    dataset_path = parts[0]
+                    # 检查最后一部分是否是 config_name（需要验证）
+                    # 这里简化处理，直接使用文件名
+                else:
+                    dataset_path = file_name
+            
+            # 从 YAML 文件重新读取 task 字段
+            task_from_yaml = find_task_from_yaml(dataset_path, config_name)
+            
+            if task_from_yaml:
+                # 更新 task 和 name 字段
+                old_task = metadata.get("task")
+                old_name = metadata.get("name")
+                
+                metadata["task"] = task_from_yaml
+                # 优先使用 task 作为 name
+                if not metadata.get("name") or metadata.get("name") == old_name:
+                    metadata["name"] = task_from_yaml
+                
+                # 保存更新后的元数据
+                with open(metadata_file, "w", encoding="utf-8") as f:
+                    json.dump(metadata, f, ensure_ascii=False, indent=2)
+                
+                if old_task != task_from_yaml or old_name != task_from_yaml:
+                    fixed_count += 1
+                    print(f"修复数据集元数据: {dataset_path}/{config_name}, task: {old_task} -> {task_from_yaml}")
+        except Exception as e:
+            error_count += 1
+            print(f"修复数据集元数据失败 {metadata_file}: {e}")
+    
+    return {
+        "fixed_count": fixed_count,
+        "error_count": error_count,
+        "message": f"修复完成：成功修复 {fixed_count} 个数据集，{error_count} 个错误"
+    }
 
 
 @router.post("/refresh-cache")
