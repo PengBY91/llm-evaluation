@@ -52,7 +52,7 @@ class DatasetAddRequest(BaseModel):
 
 class DatasetResponse(BaseModel):
     """数据集响应"""
-    name: str  # 数据集名称（文件夹名称，用于显示）
+    name: str  # 数据集名称（来自 YAML 配置中的 task 字段）
     path: str  # 数据集路径（HuggingFace 路径）
     config_name: Optional[str] = None  # 配置名称（子文件夹名称）
     task_name: Optional[str] = None  # 任务名称（从 TaskManager 获取，用于评测）
@@ -191,7 +191,7 @@ def load_all_datasets() -> List[Dict[str, Any]]:
         datasets = []
         
         # 扫描本地 data 目录
-        # 数据集名称使用文件夹名称（保持原样，不替换下划线），而不是 TaskManager 的任务名称
+        # 数据集名称将使用 YAML 配置中的 task 字段（在匹配到 TaskManager 后更新）
         if DATA_DIR.exists():
             for dataset_dir in DATA_DIR.iterdir():
                 if dataset_dir.is_dir() and not dataset_dir.name.startswith('.'):
@@ -208,10 +208,10 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             dataset_path = dataset_dir.name  # 保持原样，不替换下划线
                             # 配置名称：子文件夹名称
                             config_name = config_dir.name
-                            # 数据集名称：文件夹名称（用于显示，保持原样）
-                            dataset_name = dataset_dir.name  # 保持原样，不替换下划线
+                            # 数据集名称：初始使用文件夹名称，后续将从 YAML 配置中的 task 字段更新
+                            dataset_name = dataset_dir.name  # 初始值，后续会更新为 task 字段
                             
-                            # 尝试加载数据集，即使失败也添加到列表中（稍后从 TaskManager 匹配 task_name）
+                            # 尝试加载数据集，即使失败也添加到列表中（稍后从 TaskManager 匹配 task_name 和 task 字段）
                             splits = None
                             num_examples = None
                             try:
@@ -224,7 +224,7 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             
                             # 创建数据集对象
                             dataset_info = {
-                                "name": dataset_name,  # 使用文件夹名称作为显示名称（保持原样）
+                                "name": dataset_name,  # 初始值，后续将从 YAML 配置中的 task 字段更新
                                 "path": dataset_path,  # 保持原样，用于匹配 TaskManager
                                 "config_name": config_name,
                                 "task_name": None,  # 稍后从 TaskManager 获取
@@ -252,9 +252,9 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                     else:
                         # 没有子文件夹，直接是数据集
                         dataset_path = dataset_dir.name  # 保持原样，不替换下划线
-                        dataset_name = dataset_dir.name  # 保持原样，不替换下划线
+                        dataset_name = dataset_dir.name  # 初始值，后续将从 YAML 配置中的 task 字段更新
                         
-                        # 尝试加载数据集，即使失败也添加到列表中（稍后从 TaskManager 匹配 task_name）
+                        # 尝试加载数据集，即使失败也添加到列表中（稍后从 TaskManager 匹配 task_name 和 task 字段）
                         splits = None
                         num_examples = None
                         try:
@@ -267,7 +267,7 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                         
                         # 创建数据集对象
                         dataset_info = {
-                            "name": dataset_name,  # 使用文件夹名称作为显示名称（保持原样）
+                            "name": dataset_name,  # 初始值，后续将从 YAML 配置中的 task 字段更新
                             "path": dataset_path,  # 保持原样，用于匹配 TaskManager
                             "config_name": None,
                             "task_name": None,  # 稍后从 TaskManager 获取
@@ -321,7 +321,8 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             dataset["task_name"] = group_name
                             break
             
-            # 遍历 TaskManager 中的所有任务，尝试匹配已扫描的本地数据集
+            # 遍历 TaskManager 中的所有任务（包括独立任务和组），尝试匹配已扫描的本地数据集
+            # 先处理独立任务（subtasks）
             for task_name in task_manager.all_subtasks:
                 task_info = task_manager.task_index.get(task_name, {})
                 yaml_path = task_info.get("yaml_path", -1)
@@ -331,6 +332,12 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                         from lm_eval import utils
                         config = utils.load_yaml_config(yaml_path, mode="simple")
                         dataset_path = config.get("dataset_path")
+                        
+                        # 获取 task 字段作为数据集名称（对于独立任务，这是字符串）
+                        task_name_from_config = config.get("task")
+                        # 如果 task 是列表（不应该在独立任务中出现），取第一个
+                        if isinstance(task_name_from_config, list):
+                            task_name_from_config = task_name_from_config[0] if task_name_from_config else None
                         
                         if dataset_path:
                             dataset_name = config.get("dataset_name")
@@ -391,8 +398,10 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                             if existing_index is not None:
                                 # 如果已存在，更新 task_name 字段（从 TaskManager 获取），并补充其他信息
                                 existing_dataset = datasets[existing_index]
+                                # 更新数据集名称：使用 YAML 配置中的 task 字段
+                                if task_name_from_config:
+                                    existing_dataset["name"] = task_name_from_config
                                 # 更新 task_name 字段为正确的任务名称（从 TaskManager 获取，用于评测）
-                                # name 字段保持不变（使用文件夹名称，用于显示）
                                 # 注意：如果 config_name 是 "all"，可能需要匹配多个任务，这里优先匹配 dataset_name 为 None 的任务
                                 if existing_dataset.get("task_name") is None:
                                     existing_dataset["task_name"] = best_match_task_name or task_name
@@ -468,34 +477,13 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     elif isinstance(tag_value, list):
                                         tags = tag_value
                                 
-                                # 数据集名称：优先使用本地文件夹名称（下划线格式），如果没有则使用 dataset_path（将斜杠转换为下划线）
-                                if is_local and local_path:
-                                    # 如果数据集在本地，从本地路径提取文件夹名称
-                                    # local_path 格式：/path/to/data/dataset_folder/config_folder
-                                    # 需要提取 dataset_folder
-                                    local_path_parts = Path(local_path).parts
-                                    if len(local_path_parts) >= 2:
-                                        # 找到 data 目录的索引
-                                        try:
-                                            data_index = local_path_parts.index("data")
-                                            if len(local_path_parts) > data_index + 1:
-                                                dataset_folder = local_path_parts[data_index + 1]
-                                                display_name = dataset_folder  # 使用文件夹名称（下划线格式）
-                                            else:
-                                                display_name = dataset_path.replace("/", "_")  # 将斜杠转换为下划线
-                                        except ValueError:
-                                            display_name = dataset_path.replace("/", "_")  # 将斜杠转换为下划线
-                                    else:
-                                        display_name = dataset_path.replace("/", "_")  # 将斜杠转换为下划线
-                                else:
-                                    # 如果数据集不在本地，将斜杠转换为下划线以保持一致性
-                                    display_name = dataset_path.replace("/", "_")
-                                    if dataset_name:
-                                        display_name = f"{display_name}_{dataset_name}"
+                                # 数据集名称：使用 YAML 配置中的 task 字段
+                                # 如果没有 task 字段，则使用 task_name 作为后备
+                                dataset_display_name = task_name_from_config if task_name_from_config else task_name
                                 
                                 # 创建数据集对象
                                 dataset_info = {
-                                    "name": display_name,  # 使用文件夹名称（下划线格式）作为显示名称
+                                    "name": dataset_display_name,  # 使用 YAML 配置中的 task 字段作为数据集名称
                                     "path": dataset_path,  # 保持原始路径（可能包含斜杠，用于匹配）
                                     "config_name": dataset_name,
                                     "task_name": task_name,  # 从 TaskManager 获取的任务名称（用于评测）
@@ -523,18 +511,129 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                 datasets.append(dataset_info)
                     except Exception:
                         pass
+            
+            # 处理组（groups）- 组也可能对应数据集
+            for group_name in task_manager.all_groups:
+                task_info = task_manager.task_index.get(group_name, {})
+                yaml_path = task_info.get("yaml_path", -1)
+                
+                if yaml_path != -1:
+                    try:
+                        from lm_eval import utils
+                        config = utils.load_yaml_config(yaml_path, mode="simple")
+                        dataset_path = config.get("dataset_path")
+                        
+                        # 对于组配置，task 字段是列表，但我们使用 group 名称作为数据集名称
+                        # group 名称作为 task_name（用于评测），group 名称也作为数据集显示名称
+                        task_name_from_config = group_name  # 组名作为数据集名称
+                        
+                        if dataset_path:
+                            dataset_name = config.get("dataset_name")
+                            
+                            # 检查是否已在列表中（匹配 path 和 config_name）
+                            existing_index = None
+                            for idx, d in enumerate(datasets):
+                                d_path = d.get("path")
+                                d_config = d.get("config_name")
+                                
+                                # 匹配 path
+                                path_matches = (
+                                    d_path == dataset_path or
+                                    d_path == dataset_path.replace("/", "_") or
+                                    d_path.replace("_", "/") == dataset_path or
+                                    d_path.replace("_", "/") == dataset_path.replace("/", "_")
+                                )
+                                
+                                # 匹配 config_name（组配置通常没有 config_name，或者 config_name 是 "all"）
+                                config_matches = (
+                                    (dataset_name is None and d_config is None) or
+                                    (dataset_name is not None and d_config == dataset_name) or
+                                    d_config == "all"  # config_name 为 "all" 可以匹配组
+                                )
+                                
+                                if path_matches and config_matches:
+                                    existing_index = idx
+                                    break
+                            
+                            if existing_index is not None:
+                                # 如果已存在，更新为组信息
+                                existing_dataset = datasets[existing_index]
+                                # 更新数据集名称：使用组名
+                                existing_dataset["name"] = task_name_from_config
+                                # 更新 task_name 为组名（用于评测）
+                                existing_dataset["task_name"] = group_name
+                            else:
+                                # 检查本地是否存在对应的数据集
+                                local_path = get_local_dataset_path(dataset_path.replace("/", "_"), dataset_name)
+                                is_local = local_path.exists()
+                                
+                                # 如果数据集在本地，尝试加载获取 splits 和 num_examples
+                                splits = None
+                                num_examples = None
+                                if is_local:
+                                    try:
+                                        dataset = load_from_disk(str(local_path))
+                                        splits = list(dataset.keys())
+                                        num_examples = {split: len(dataset[split]) for split in splits}
+                                    except Exception:
+                                        pass
+                                
+                                # 获取标签
+                                tags = []
+                                if "tag" in config:
+                                    tag_value = config["tag"]
+                                    if isinstance(tag_value, str):
+                                        tags = [tag_value]
+                                    elif isinstance(tag_value, list):
+                                        tags = tag_value
+                                
+                                # 创建数据集对象（组）
+                                dataset_info = {
+                                    "name": task_name_from_config,  # 使用组名作为数据集名称
+                                    "path": dataset_path,
+                                    "config_name": dataset_name,
+                                    "task_name": group_name,  # 组名作为任务名称（用于评测）
+                                    "description": f"Group: {group_name}",
+                                    "local_path": str(local_path) if is_local else None,
+                                    "is_local": is_local,
+                                    "splits": splits,
+                                    "num_examples": num_examples,
+                                    "category": infer_category(dataset_path, group_name, tags),
+                                    "tags": tags
+                                }
+                                
+                                # 合并已保存的元数据（如果存在）
+                                metadata_key = f"{dataset_path}:{dataset_name}" if dataset_name else dataset_path
+                                if metadata_key in saved_metadata:
+                                    saved_meta = saved_metadata[metadata_key]
+                                    if "description" in saved_meta:
+                                        dataset_info["description"] = saved_meta["description"]
+                                    if "category" in saved_meta:
+                                        dataset_info["category"] = saved_meta["category"]
+                                    if "tags" in saved_meta:
+                                        dataset_info["tags"] = saved_meta["tags"]
+                                
+                                datasets.append(dataset_info)
+                    except Exception:
+                        pass
         except Exception:
             pass
         
         # 确保所有数据集都有 name 字段（应该已经有了，但为了安全起见）
-        # 如果 name 为 None，使用 path（将斜杠转换为下划线）作为显示名称
+        # 如果 name 为 None，使用 task_name（从 TaskManager 获取的任务名称）作为后备
+        # 如果 task_name 也没有，则使用 path（将斜杠转换为下划线）作为最后的后备
         for dataset in datasets:
             if dataset.get("name") is None:
-                path_name = dataset.get("path", "").replace("/", "_")  # 将斜杠转换为下划线
-                if dataset.get("config_name"):
-                    dataset["name"] = f"{path_name}_{dataset['config_name']}"
+                # 优先使用 task_name
+                if dataset.get("task_name"):
+                    dataset["name"] = dataset["task_name"]
                 else:
-                    dataset["name"] = path_name
+                    # 如果 task_name 也没有，使用 path 作为后备
+                    path_name = dataset.get("path", "").replace("/", "_")  # 将斜杠转换为下划线
+                    if dataset.get("config_name"):
+                        dataset["name"] = f"{path_name}_{dataset['config_name']}"
+                    else:
+                        dataset["name"] = path_name
         
         _datasets_cache = datasets
         return datasets
@@ -928,8 +1027,9 @@ async def add_dataset(request: DatasetAddRequest):
         splits = list(dataset.keys())
         num_examples = {split: len(dataset[split]) for split in splits}
         
-        # 尝试从 TaskManager 获取正确的任务名称
+        # 尝试从 TaskManager 获取正确的任务名称和 task 字段
         task_name = None
+        task_from_config = None
         try:
             from lm_eval.tasks import TaskManager
             task_manager = TaskManager()
@@ -943,6 +1043,8 @@ async def add_dataset(request: DatasetAddRequest):
                         if (config.get("dataset_path") == request.dataset_path and 
                             config.get("dataset_name") == request.dataset_name):
                             task_name = t_name
+                            # 获取 YAML 配置中的 task 字段作为数据集名称
+                            task_from_config = config.get("task")
                             break
                     except Exception:
                         pass
@@ -953,14 +1055,12 @@ async def add_dataset(request: DatasetAddRequest):
         if task_name is None:
             task_name = request.dataset_path + (f"_{request.dataset_name}" if request.dataset_name else "")
         
-        # 数据集名称使用路径（将斜杠转换为下划线，用于显示）
-        display_name = request.dataset_path.replace("/", "_")
-        if request.dataset_name:
-            display_name = f"{display_name}_{request.dataset_name}"
+        # 数据集名称：优先使用 YAML 配置中的 task 字段，如果没有则使用 task_name
+        dataset_display_name = task_from_config if task_from_config else task_name
         
         # 构建数据集响应
         dataset_response = DatasetResponse(
-            name=display_name,  # 使用路径作为显示名称
+            name=dataset_display_name,  # 使用 YAML 配置中的 task 字段作为数据集名称
             path=request.dataset_path,
             config_name=request.dataset_name,
             task_name=task_name,  # 从 TaskManager 获取的任务名称（用于评测）

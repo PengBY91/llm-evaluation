@@ -77,7 +77,7 @@ tasks_db = load_all_tasks_from_files()
 
 class DatasetInfo(BaseModel):
     """数据集信息（用于任务创建）"""
-    name: str  # 数据集显示名称（文件夹名称）
+    name: str  # 数据集显示名称（来自 YAML 配置中的 task 字段）
     task_name: Optional[str] = None  # 正确的任务名称（从 TaskManager 获取，用于评测）
     path: Optional[str] = None
     config_name: Optional[str] = None
@@ -359,18 +359,33 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         normalized_tasks = request.tasks
     
     # 检查是否有无效的任务名称
-    available_tasks = set(task_manager.all_subtasks)
+    # 使用 all_tasks（包含 groups + subtasks + tags）进行验证，因为 simple_evaluate 可以接受组名
+    available_tasks = set(task_manager.all_tasks)
     invalid_tasks = [t for t in normalized_tasks if t not in available_tasks]
     if invalid_tasks:
-        # 提供更友好的错误信息
-        error_msg = f"以下任务名称无效或不存在: {', '.join(invalid_tasks)}。\n"
-        error_msg += "这可能是因为数据集没有对应的任务名称（task_name）。\n"
-        error_msg += "请确保选择的数据集在 TaskManager 中有对应的任务定义。\n"
-        error_msg += f"可用的任务名称示例: {', '.join(list(available_tasks)[:10])}..."
-        raise HTTPException(
-            status_code=400,
-            detail=error_msg
-        )
+        # 使用 match_tasks 进行更灵活的匹配（支持通配符等）
+        matched_tasks = task_manager.match_tasks(normalized_tasks)
+        still_invalid = [t for t in invalid_tasks if t not in matched_tasks]
+        
+        if still_invalid:
+            # 提供更友好的错误信息
+            error_msg = f"以下任务名称无效或不存在: {', '.join(still_invalid)}。\n"
+            error_msg += "这可能是因为数据集没有对应的任务名称（task_name）。\n"
+            error_msg += "请确保选择的数据集在 TaskManager 中有对应的任务定义。\n"
+            error_msg += "提示：可以使用的任务类型包括：\n"
+            error_msg += f"- 独立任务（subtasks）: {len(task_manager.all_subtasks)} 个\n"
+            error_msg += f"- 任务组（groups）: {len(task_manager.all_groups)} 个\n"
+            if task_manager.all_groups:
+                error_msg += f"可用任务组示例: {', '.join(list(task_manager.all_groups)[:5])}...\n"
+            if task_manager.all_subtasks:
+                error_msg += f"可用独立任务示例: {', '.join(list(task_manager.all_subtasks)[:5])}..."
+            raise HTTPException(
+                status_code=400,
+                detail=error_msg
+            )
+        # 如果有匹配的任务，使用匹配的结果
+        else:
+            normalized_tasks = matched_tasks
     
     task_id = str(uuid.uuid4())
     

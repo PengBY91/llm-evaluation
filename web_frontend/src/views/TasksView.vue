@@ -142,20 +142,21 @@
             style="width: 100%"
             :loading="loadingAvailableTasks"
             filterable
+            :filter-method="filterTasks"
             @visible-change="handleTaskSelectVisible"
             @focus="handleTaskSelectFocus"
-            value-key="name"
+            value-key="uniqueKey"
           >
             <el-option 
-              v-for="dataset in availableTasks" 
-              :key="dataset.name" 
-              :label="dataset.name" 
+              v-for="dataset in filteredAvailableTasks" 
+              :key="dataset.uniqueKey" 
+              :label="getDatasetLabel(dataset)" 
               :value="dataset"
             >
               <div>
-                <div>{{ dataset.name }}</div>
+                <div>{{ getDatasetLabel(dataset) }}</div>
                 <div style="font-size: 12px; color: #999;" v-if="dataset.path">
-                  {{ dataset.path }}{{ dataset.config_name ? ` (${dataset.config_name})` : '' }}
+                  {{ dataset.path }}
                 </div>
               </div>
             </el-option>
@@ -243,6 +244,7 @@ import { datasetsApi } from '../api/datasets'
 const tasks = ref([])
 const models = ref([])
 const availableTasks = ref([])  // 存储完整的数据集信息对象
+const filteredAvailableTasks = ref([])  // 过滤后的数据集列表
 const availableDatasets = ref([])  // 存储所有数据集信息，用于查找
 const loading = ref(false)
 const showCreateDialog = ref(false)
@@ -251,6 +253,7 @@ const currentTask = ref(null)
 const modelArgsStr = ref('{}')
 const loadingAvailableTasks = ref(false)
 const fixingTaskNames = ref(false)
+const taskFilterKeyword = ref('')  // 用于存储过滤关键词
 
 const selectedModelId = ref(null)
 
@@ -297,6 +300,51 @@ const getModelTypeLabel = (type) => {
   return typeMap[type] || type
 }
 
+// 获取数据集的显示标签（数据集名称 + 配置名称）
+const getDatasetLabel = (dataset) => {
+  if (!dataset) return ''
+  const name = dataset.name || ''
+  const configName = dataset.config_name
+  if (configName) {
+    return `${name} (${configName})`
+  }
+  return name
+}
+
+// 获取数据集的唯一键（用于去重和 value-key）
+const getDatasetKey = (dataset) => {
+  if (!dataset) return ''
+  const name = dataset.name || ''
+  const configName = dataset.config_name
+  if (configName) {
+    return `${name}__${configName}`
+  }
+  return name
+}
+
+// 过滤任务列表
+const filterTasks = (query) => {
+  taskFilterKeyword.value = query
+  if (!query) {
+    filteredAvailableTasks.value = availableTasks.value
+    return
+  }
+  
+  const queryLower = query.toLowerCase()
+  filteredAvailableTasks.value = availableTasks.value.filter(dataset => {
+    const label = getDatasetLabel(dataset).toLowerCase()
+    const name = (dataset.name || '').toLowerCase()
+    const configName = (dataset.config_name || '').toLowerCase()
+    const path = (dataset.path || '').toLowerCase()
+    
+    // 同时搜索名称、配置名称和路径
+    return label.includes(queryLower) || 
+           name.includes(queryLower) || 
+           configName.includes(queryLower) ||
+           path.includes(queryLower)
+  })
+}
+
 const handleCreateTaskClick = () => {
   // 重置表单
   selectedModelId.value = null
@@ -315,6 +363,10 @@ const handleCreateTaskClick = () => {
     config_id: null
   }
   modelArgsStr.value = '{}'
+  
+  // 重置过滤状态
+  taskFilterKeyword.value = ''
+  filteredAvailableTasks.value = availableTasks.value
   
   // 打开对话框
   showCreateDialog.value = true
@@ -402,7 +454,7 @@ const createTask = async () => {
       datasets: taskForm.value.tasks
         .filter(task => typeof task === 'object' && task !== null)
         .map(task => ({
-          name: task.name,  // 数据集显示名称（文件夹名称）
+          name: task.name,  // 数据集显示名称（来自 YAML 配置中的 task 字段）
           task_name: task.task_name,  // 正确的任务名称（从 TaskManager 获取，用于评测）
           path: task.path,
           config_name: task.config_name
@@ -665,7 +717,7 @@ const loadAvailableTasks = async () => {
       return
     }
     
-    // 过滤并确保所有数据集都有正确的 name 字段
+    // 过滤并确保所有数据集都有正确的 name 字段和唯一键
     const validDatasets = allDatasets
       .filter(dataset => dataset && (dataset.name || dataset.path))  // 过滤无效数据
       .map(dataset => {
@@ -678,23 +730,27 @@ const loadAvailableTasks = async () => {
           }
           dataset.name = taskName
         }
+        // 添加唯一键字段（用于 value-key 和去重）
+        dataset.uniqueKey = getDatasetKey(dataset)
         return dataset
       })
     
-    // 去重（基于 name），保留第一个
+    // 去重（基于数据集名称 + 配置名称），保留第一个
     const uniqueDatasets = []
-    const seenNames = new Set()
+    const seenKeys = new Set()
     for (const dataset of validDatasets) {
-      if (!seenNames.has(dataset.name)) {
-        seenNames.add(dataset.name)
+      const key = dataset.uniqueKey
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key)
         uniqueDatasets.push(dataset)
       }
     }
     
-    // 按名称排序
-    uniqueDatasets.sort((a, b) => a.name.localeCompare(b.name))
+    // 按显示标签排序
+    uniqueDatasets.sort((a, b) => getDatasetLabel(a).localeCompare(getDatasetLabel(b)))
     
     availableTasks.value = uniqueDatasets
+    filteredAvailableTasks.value = uniqueDatasets
     availableDatasets.value = uniqueDatasets
     
     if (availableTasks.value.length === 0) {
@@ -746,6 +802,9 @@ const handleDialogOpened = () => {
   if (models.value.length === 0) {
     loadModels()
   }
+  // 重置过滤状态
+  taskFilterKeyword.value = ''
+  filteredAvailableTasks.value = availableTasks.value
 }
 
 onMounted(() => {
