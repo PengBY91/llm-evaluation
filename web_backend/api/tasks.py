@@ -14,10 +14,7 @@ from pathlib import Path
 import threading
 import lm_eval
 from lm_eval.tasks import TaskManager
-import sys
-import os
 # 导入模型相关的函数
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from api.models import get_model_args, load_model_from_file
 
 router = APIRouter()
@@ -77,6 +74,7 @@ tasks_db = load_all_tasks_from_files()
 
 class DatasetInfo(BaseModel):
     """数据集信息（用于任务创建）"""
+    id: Optional[str] = None
     name: str  # 数据集显示名称（文件夹名称）
     task_name: Optional[str] = None  # 正确的任务名称（从 TaskManager 获取，用于评测）
     path: Optional[str] = None
@@ -111,6 +109,7 @@ class TaskResponse(BaseModel):
     model: str  # 模型类型
     model_name: Optional[str] = None  # 模型名称（用于显示）
     tasks: List[str]
+    datasets: Optional[List[DatasetInfo]] = None # 数据集信息
     created_at: str
     updated_at: str
     progress: Optional[Dict[str, Any]] = None
@@ -298,7 +297,12 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             else:
                 # 可能是任务名称匹配问题
                 available_tasks = set(task_manager.all_subtasks)
-                if task_name not in available_tasks:
+                available_groups = set(task_manager.all_groups)
+                available_all = available_tasks.union(available_groups)
+                if hasattr(task_manager, 'all_tasks'):
+                    available_all = available_all.union(set(task_manager.all_tasks))
+                
+                if task_name not in available_all:
                     error_message = f"任务 '{task_name}' 未找到。请确认任务名称是否正确，或使用 '修复任务名称' 功能修复。"
                 else:
                     error_message = f"任务 '{task_name}' 执行失败。请检查任务配置、模型参数或数据集是否正确。"
@@ -359,14 +363,52 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         normalized_tasks = request.tasks
     
     # 检查是否有无效的任务名称
+    # 注意：TaskManager 的 all_subtasks 和 all_groups 可能不包含所有有效的任务名称
+    # 尤其是对于使用 yaml 配置文件动态加载的任务，或者某些通过 path 加载的任务
+    # 因此，如果任务名称在 TaskManager 中找不到，但它看起来像是一个有效的任务（例如 path 格式），我们尝试信任它
+    
     available_tasks = set(task_manager.all_subtasks)
-    invalid_tasks = [t for t in normalized_tasks if t not in available_tasks]
+    available_groups = set(task_manager.all_groups)
+    available_all = available_tasks.union(available_groups)
+    
+    # 尝试将 task_manager.all_tasks 也加入，以防遗漏
+    if hasattr(task_manager, 'all_tasks'):
+        available_all = available_all.union(set(task_manager.all_tasks))
+    
+    invalid_tasks = []
+    for t in normalized_tasks:
+        if t not in available_all:
+            # 尝试更宽松的验证：
+            # 1. 如果它在 datasets 列表中有对应的 task_name，我们假设它是有效的（因为 datasets.py 已经验证过）
+            # 2. 如果它看起来像是一个路径或者包含配置信息，我们也暂时允许
+            
+            is_valid_override = False
+            
+            # 检查 datasets 中的 task_name
+            if request.datasets:
+                for ds in request.datasets:
+                    if ds.task_name == t:
+                        is_valid_override = True
+                        break
+            
+            if not is_valid_override:
+                # 如果没有被覆盖，才标记为无效
+                invalid_tasks.append(t)
+    
     if invalid_tasks:
         # 提供更友好的错误信息
+        # 但考虑到 TaskManager 可能不完整，这里改为警告并允许继续，或者只记录日志
+        # 为了安全起见，我们还是抛出异常，但提供更详细的建议
         error_msg = f"以下任务名称无效或不存在: {', '.join(invalid_tasks)}。\n"
         error_msg += "这可能是因为数据集没有对应的任务名称（task_name）。\n"
         error_msg += "请确保选择的数据集在 TaskManager 中有对应的任务定义。\n"
         error_msg += f"可用的任务名称示例: {', '.join(list(available_tasks)[:10])}..."
+        
+        # 记录日志而不是直接抛出异常（或者在开发模式下允许）
+        # 这里我们选择相信 datasets.py 的判断，如果 task_name 是从 datasets.py 获取的，它应该是正确的
+        # 但如果是前端直接传递的字符串，可能是错误的
+        
+        # 只有当确实找不到任何匹配时才报错
         raise HTTPException(
             status_code=400,
             detail=error_msg
@@ -383,6 +425,7 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         "model_name": model_name,  # 模型名称（用于显示）
         "model_args": final_model_args,  # 使用构建好的 model_args
         "tasks": normalized_tasks,  # 使用转换后的任务名称
+        "datasets": [d.dict() for d in request.datasets] if request.datasets else None,
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
         "progress": None,
@@ -421,18 +464,6 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
 
 
 # 已移除 build_task_name_mapping 函数，因为现在应该直接使用正确的任务名称（从数据集对象的 task_name 字段获取）
-
-
-@router.post("/fix-task-names")
-async def fix_task_names():
-    """修复所有任务中的错误任务名称（已废弃，现在应该直接使用正确的任务名称）"""
-    # 此功能已废弃，因为现在应该直接使用正确的任务名称（从数据集对象的 task_name 字段获取）
-    # 如果任务名称错误，应该重新创建任务并选择正确的数据集
-    return {
-        "message": "此功能已废弃。请重新创建任务并选择正确的数据集，系统会自动使用正确的任务名称。",
-        "fixed_count": 0,
-        "fixed_tasks": []
-    }
 
 
 @router.post("/{task_id}/start")
@@ -515,6 +546,13 @@ async def list_tasks():
             
             # 如果任务没有 model_name 但有 model_id，尝试从模型文件加载模型名称
             task = tasks_db[task_id]
+            
+            # 补救措施：如果 datasets 为空，但 original_request_data 中有，尝试恢复
+            if not task.get("datasets") and task.get("original_request_data") and task["original_request_data"].get("datasets"):
+                task["datasets"] = task["original_request_data"]["datasets"]
+                # 可选：保存修复后的数据
+                # save_task_to_file(task_id, task)
+
             if not task.get("model_name") and task.get("model_id"):
                 try:
                     model_data = load_model_from_file(task["model_id"])
@@ -541,6 +579,12 @@ async def get_task(task_id: str):
                 raise HTTPException(status_code=404, detail="任务不存在")
         
         task = tasks_db[task_id]
+        
+        # 补救措施：如果 datasets 为空，但 original_request_data 中有，尝试恢复
+        if not task.get("datasets") and task.get("original_request_data") and task["original_request_data"].get("datasets"):
+            task["datasets"] = task["original_request_data"]["datasets"]
+            # 可选：保存修复后的数据
+            # save_task_to_file(task_id, task)
         
         # 如果任务没有 model_name 但有 model_id，尝试从模型文件加载模型名称
         if not task.get("model_name") and task.get("model_id"):

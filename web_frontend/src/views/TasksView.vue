@@ -4,14 +4,6 @@
       <h2>评测任务管理</h2>
       <div>
         <el-button 
-          type="warning" 
-          @click="handleFixTaskNames"
-          :loading="fixingTaskNames"
-          style="margin-right: 10px;"
-        >
-          修复任务名称
-        </el-button>
-        <el-button 
           type="primary" 
           @click="handleCreateTaskClick"
           :loading="loadingAvailableTasks"
@@ -29,11 +21,28 @@
           {{ row.model_name || row.model }}
         </template>
       </el-table-column>
-      <el-table-column prop="tasks" label="评测任务" width="200">
+      <el-table-column prop="tasks" label="评测任务" width="300">
         <template #default="{ row }">
-          <el-tag v-for="task in row.tasks" :key="task" size="small" style="margin-right: 5px;">
-            {{ task }}
-          </el-tag>
+          <div v-if="row.datasets && row.datasets.length > 0">
+             <div v-for="ds in row.datasets" :key="ds.id" style="margin-bottom: 4px;">
+                <el-tag size="small" style="margin-right: 5px;">
+                  <span v-if="ds.config_name && !ds.name.includes(ds.config_name)">
+                     {{ ds.name }} ({{ ds.config_name }})
+                  </span>
+                  <span v-else-if="ds.path && ds.path !== ds.name">
+                     {{ ds.name }} ({{ ds.path }})
+                  </span>
+                  <span v-else>
+                     {{ ds.name }}
+                  </span>
+                </el-tag>
+             </div>
+          </div>
+          <div v-else>
+             <el-tag v-for="task in row.tasks" :key="task" size="small" style="margin-right: 5px; margin-bottom: 2px;">
+               {{ task }}
+             </el-tag>
+          </div>
         </template>
       </el-table-column>
       <el-table-column prop="status" label="状态" width="100">
@@ -144,18 +153,44 @@
             filterable
             @visible-change="handleTaskSelectVisible"
             @focus="handleTaskSelectFocus"
-            value-key="name"
+            value-key="id"
           >
             <el-option 
               v-for="dataset in availableTasks" 
-              :key="dataset.name" 
-              :label="dataset.name" 
+              :key="dataset.id" 
+              :label="getDatasetLabel(dataset)" 
               :value="dataset"
+              :disabled="!getDatasetCompatibilityInfo(dataset).compatible"
             >
-              <div>
-                <div>{{ dataset.name }}</div>
-                <div style="font-size: 12px; color: #999;" v-if="dataset.path">
-                  {{ dataset.path }}{{ dataset.config_name ? ` (${dataset.config_name})` : '' }}
+              <el-tooltip 
+                v-if="!getDatasetCompatibilityInfo(dataset).compatible" 
+                :content="getDatasetCompatibilityInfo(dataset).reason" 
+                placement="right"
+              >
+                <div style="opacity: 0.6; cursor: not-allowed;">
+                  <div style="display: flex; align-items: center;">
+                    <span style="font-weight: 500;">
+                      {{ dataset.name }}
+                      <span v-if="dataset.config_name && dataset.name !== dataset.config_name" style="font-weight: normal; font-size: 13px;">
+                        ({{ dataset.config_name }})
+                      </span>
+                    </span>
+                    <el-tag size="small" type="danger" style="margin-left: 5px;">不支持</el-tag>
+                  </div>
+                  <div style="font-size: 12px; color: #999;" v-if="dataset.path && dataset.path !== dataset.name">
+                    Dataset: {{ dataset.path }}{{ dataset.config_name ? ` / ${dataset.config_name}` : '' }}
+                  </div>
+                </div>
+              </el-tooltip>
+              <div v-else>
+                <div style="font-weight: 500;">
+                  {{ dataset.name }}
+                  <span v-if="dataset.config_name && dataset.name !== dataset.config_name" style="font-weight: normal; color: #666; font-size: 13px;">
+                    ({{ dataset.config_name }})
+                  </span>
+                </div>
+                <div style="font-size: 12px; color: #999;" v-if="dataset.path && dataset.path !== dataset.name">
+                  Dataset: {{ dataset.path }}{{ dataset.config_name ? ` / ${dataset.config_name}` : '' }}
                 </div>
               </div>
             </el-option>
@@ -210,9 +245,16 @@
         <el-divider />
         
         <h3>评测任务</h3>
-        <el-tag v-for="task in currentTask.tasks" :key="task" style="margin-right: 5px;">
-          {{ task }}
-        </el-tag>
+        <div v-if="currentTask.datasets && currentTask.datasets.length > 0">
+           <el-tag v-for="ds in currentTask.datasets" :key="ds.id" style="margin-right: 5px; margin-bottom: 5px;">
+              {{ getDatasetLabel(ds) }}
+           </el-tag>
+        </div>
+        <div v-else>
+          <el-tag v-for="task in currentTask.tasks" :key="task" style="margin-right: 5px;">
+            {{ task }}
+          </el-tag>
+        </div>
         
         <el-divider />
         
@@ -250,8 +292,6 @@ const showDetailDialog = ref(false)
 const currentTask = ref(null)
 const modelArgsStr = ref('{}')
 const loadingAvailableTasks = ref(false)
-const fixingTaskNames = ref(false)
-
 const selectedModelId = ref(null)
 
 const taskForm = ref({
@@ -295,6 +335,91 @@ const getModelTypeLabel = (type) => {
     'hf': 'HuggingFace'
   }
   return typeMap[type] || type
+}
+
+const getDatasetLabel = (dataset) => {
+  // 后端已经统一格式化为 "Task (Config)"，直接使用即可
+  // 如果后端没有格式化（旧数据），这里做一个兜底
+  if (dataset.config_name && !dataset.name.includes(dataset.config_name)) {
+    return `${dataset.name} (${dataset.config_name})`
+  }
+  return dataset.name
+}
+
+const isDatasetCompatible = (dataset) => {
+  // 如果没有选择模型类型，默认都兼容
+  if (!taskForm.value.model) return true
+  
+  const isChatModel = taskForm.value.model.includes('chat')
+  const taskName = (dataset.task_name || dataset.name).toLowerCase()
+  const outputType = dataset.output_type ? dataset.output_type.toLowerCase() : null
+  
+  if (isChatModel) {
+    // 1. 如果 output_type 明确为 loglikelihood，则不兼容
+    // 除非它是 generative 任务（虽然通常 generative 对应 generate_until）
+    if (outputType === 'loglikelihood' || outputType === 'loglikelihood_rolling') {
+       // 再检查一下任务名称是否包含 cot/gen，因为有时候 output_type 可能是 loglikelihood 但通过特殊方式支持（较少见）
+       if (taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')) {
+           return true
+       }
+       return false
+    }
+    
+    // 2. 如果 output_type 明确为 multiple_choice (通常也是 loglikelihood)
+    if (outputType === 'multiple_choice') {
+        if (taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')) {
+           return true
+       }
+       return false
+    }
+
+    // 3. 如果 output_type 是 generate_until，则兼容
+    if (outputType === 'generate_until') {
+        return true
+    }
+
+    // 4. 如果 output_type 未知，回退到基于名称的启发式判断
+    // 检查是否是已知需要 loglikelihood 的任务
+    const loglikelihoodTasks = ['mmlu', 'hellaswag', 'arc', 'winogrande', 'piqa', 'lambada', 'sciq', 'boolq', 'triviaqa']
+    const isLoglikelihoodTask = loglikelihoodTasks.some(t => taskName.includes(t))
+    const isGenerative = taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')
+    
+    if (isLoglikelihoodTask && !isGenerative) {
+       return false
+    }
+  }
+  
+  return true
+}
+
+const getDatasetCompatibilityInfo = (dataset) => {
+  if (!taskForm.value.model) return { compatible: true }
+  
+  const isChatModel = taskForm.value.model.includes('chat')
+  const taskName = (dataset.task_name || dataset.name).toLowerCase()
+  const outputType = dataset.output_type ? dataset.output_type.toLowerCase() : null
+  
+  if (isChatModel) {
+    let reason = '此任务通常需要 logprobs，OpenAI Chat 模型不支持。建议使用 Completions 模型或选择该任务的 CoT/Generative 版本。'
+    
+    if (outputType === 'loglikelihood' || outputType === 'loglikelihood_rolling' || outputType === 'multiple_choice') {
+        if (!taskName.includes('cot') && !taskName.includes('generative') && !taskName.includes('gen')) {
+            return { compatible: false, reason }
+        }
+    }
+
+    if (!outputType) {
+        const loglikelihoodTasks = ['mmlu', 'hellaswag', 'arc', 'winogrande', 'piqa', 'lambada', 'sciq', 'boolq', 'triviaqa']
+        const isLoglikelihoodTask = loglikelihoodTasks.some(t => taskName.includes(t))
+        const isGenerative = taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')
+        
+        if (isLoglikelihoodTask && !isGenerative) {
+            return { compatible: false, reason }
+        }
+    }
+  }
+  
+  return { compatible: true }
 }
 
 const handleCreateTaskClick = () => {
@@ -402,6 +527,7 @@ const createTask = async () => {
       datasets: taskForm.value.tasks
         .filter(task => typeof task === 'object' && task !== null)
         .map(task => ({
+          id: task.id,
           name: task.name,  // 数据集显示名称（文件夹名称）
           task_name: task.task_name,  // 正确的任务名称（从 TaskManager 获取，用于评测）
           path: task.path,
@@ -498,37 +624,6 @@ const stopTask = async (taskId) => {
     loadTasks()
   } catch (error) {
     ElMessage.error('终止任务失败: ' + error.message)
-  }
-}
-
-const handleFixTaskNames = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '此操作将修复所有任务中错误的任务名称（如 gsm8k_main -> gsm8k）。是否继续？',
-      '确认修复',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消'
-      }
-    )
-    
-    fixingTaskNames.value = true
-    const response = await tasksApi.fixTaskNames()
-    
-    if (response.fixed_count > 0) {
-      ElMessage.success(`成功修复 ${response.fixed_count} 个任务的任务名称`)
-      // 重新加载任务列表
-      loadTasks()
-    } else {
-      ElMessage.info('未发现需要修复的任务名称')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('修复任务名称失败: ' + (error.message || '未知错误'))
-    }
-  } finally {
-    fixingTaskNames.value = false
   }
 }
 
@@ -681,12 +776,12 @@ const loadAvailableTasks = async () => {
         return dataset
       })
     
-    // 去重（基于 name），保留第一个
+    // 去重（基于 id），保留第一个
     const uniqueDatasets = []
-    const seenNames = new Set()
+    const seenIds = new Set()
     for (const dataset of validDatasets) {
-      if (!seenNames.has(dataset.name)) {
-        seenNames.add(dataset.name)
+      if (!seenIds.has(dataset.id)) {
+        seenIds.add(dataset.id)
         uniqueDatasets.push(dataset)
       }
     }

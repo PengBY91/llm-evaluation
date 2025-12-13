@@ -59,11 +59,10 @@
     </div>
 
     <el-table :data="datasets" v-loading="loading" stripe>
-      <el-table-column prop="name" label="数据集名称" width="250" show-overflow-tooltip />
-      <el-table-column prop="config_name" label="配置名称" width="150">
+      <el-table-column label="数据集名称" width="350" show-overflow-tooltip>
         <template #default="{ row }">
-          <span v-if="row.config_name">{{ row.config_name }}</span>
-          <span v-else style="color: #999;">-</span>
+          <span>{{ row.path }}</span>
+          <span v-if="row.config_name" style="color: #909399; margin-left: 8px;">({{ row.config_name }})</span>
         </template>
       </el-table-column>
       <el-table-column prop="category" label="类别" width="150">

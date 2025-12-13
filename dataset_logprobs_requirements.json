@@ -1,0 +1,3980 @@
+{
+  "requires_logprobs": [
+    {
+      "dataset_path": "sciq",
+      "config_name": null,
+      "matched_task_name": "sciq",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "sciq",
+      "config_name": "test",
+      "matched_task_name": "sciq",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "sciq",
+      "config_name": "validation",
+      "matched_task_name": "sciq",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu_pro",
+      "config_name": null,
+      "matched_task_name": "mmlu_pro",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu_pro",
+      "config_name": "test",
+      "matched_task_name": "mmlu_pro",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu_pro",
+      "config_name": "validation",
+      "matched_task_name": "mmlu_pro",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "piqa",
+      "config_name": null,
+      "matched_task_name": "piqa",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "piqa",
+      "config_name": "test",
+      "matched_task_name": "piqa",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "piqa",
+      "config_name": "validation",
+      "matched_task_name": "piqa",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "ceval/computer_architecture",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/computer_architecture",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/computer_architecture",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "winogrande",
+      "config_name": "winogrande_xl",
+      "matched_task_name": "winogrande",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "winogrande/winogrande_xl",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "winogrande/winogrande_xl",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "openbookqa",
+      "config_name": "main",
+      "matched_task_name": "openbookqa",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "wikitext",
+      "config_name": "wikitext-2-raw-v1",
+      "matched_task_name": "wikitext",
+      "output_type": "loglikelihood_rolling"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_world_history",
+      "matched_task_name": "mmlu_high_school_world_history",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_world_history",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_world_history",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_world_history",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "electrical_engineering",
+      "matched_task_name": "mmlu_electrical_engineering",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/electrical_engineering",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/electrical_engineering",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/electrical_engineering",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "international_law",
+      "matched_task_name": "mmlu_international_law",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/international_law",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/international_law",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/international_law",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "medical_genetics",
+      "matched_task_name": "mmlu_medical_genetics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "moral_scenarios",
+      "matched_task_name": "mmlu_moral_scenarios",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/moral_scenarios",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/moral_scenarios",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/moral_scenarios",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "formal_logic",
+      "matched_task_name": "mmlu_formal_logic",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/formal_logic",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/formal_logic",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/formal_logic",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "astronomy",
+      "matched_task_name": "mmlu_astronomy",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/astronomy",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/astronomy",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/astronomy",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_computer_science",
+      "matched_task_name": "mmlu_high_school_computer_science",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_computer_science",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_computer_science",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_computer_science",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "jurisprudence",
+      "matched_task_name": "mmlu_jurisprudence",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/jurisprudence",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/jurisprudence",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/jurisprudence",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "sociology",
+      "matched_task_name": "mmlu_sociology",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/sociology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/sociology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/sociology",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "anatomy",
+      "matched_task_name": "mmlu_anatomy",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/anatomy",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/anatomy",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/anatomy",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "elementary_mathematics",
+      "matched_task_name": "mmlu_elementary_mathematics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/elementary_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/elementary_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/elementary_mathematics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_european_history",
+      "matched_task_name": "mmlu_high_school_european_history",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_european_history",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_european_history",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_european_history",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "prehistory",
+      "matched_task_name": "mmlu_prehistory",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/prehistory",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/prehistory",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/prehistory",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "professional_law",
+      "matched_task_name": "mmlu_professional_law",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/professional_law",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_law",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_law",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "moral_disputes",
+      "matched_task_name": "mmlu_moral_disputes",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/moral_disputes",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/moral_disputes",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/moral_disputes",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "machine_learning",
+      "matched_task_name": "mmlu_machine_learning",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/machine_learning",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/machine_learning",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/machine_learning",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_microeconomics",
+      "matched_task_name": "mmlu_high_school_microeconomics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_microeconomics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_microeconomics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_microeconomics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_us_history",
+      "matched_task_name": "mmlu_high_school_us_history",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_us_history",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_us_history",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_us_history",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "college_computer_science",
+      "matched_task_name": "mmlu_college_computer_science",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/college_computer_science",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_computer_science",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_computer_science",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "security_studies",
+      "matched_task_name": "mmlu_security_studies",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/security_studies",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/security_studies",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/security_studies",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "management",
+      "matched_task_name": "mmlu_management",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/management",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/management",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/management",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "econometrics",
+      "matched_task_name": "mmlu_econometrics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/econometrics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/econometrics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/econometrics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "professional_medicine",
+      "matched_task_name": "mmlu_professional_medicine",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/professional_medicine",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_medicine",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_medicine",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_geography",
+      "matched_task_name": "mmlu_high_school_geography",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_geography",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_geography",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_geography",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "public_relations",
+      "matched_task_name": "mmlu_public_relations",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/public_relations",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/public_relations",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/public_relations",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "miscellaneous",
+      "matched_task_name": "mmlu_miscellaneous",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/miscellaneous",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/miscellaneous",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/miscellaneous",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "clinical_knowledge",
+      "matched_task_name": "mmlu_clinical_knowledge",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/clinical_knowledge",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/clinical_knowledge",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/clinical_knowledge",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "world_religions",
+      "matched_task_name": "mmlu_world_religions",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/world_religions",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/world_religions",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/world_religions",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "human_sexuality",
+      "matched_task_name": "mmlu_human_sexuality",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/human_sexuality",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/human_sexuality",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/human_sexuality",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_mathematics",
+      "matched_task_name": "mmlu_high_school_mathematics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_mathematics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_government_and_politics",
+      "matched_task_name": "mmlu_high_school_government_and_politics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_government_and_politics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_government_and_politics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_government_and_politics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "us_foreign_policy",
+      "matched_task_name": "mmlu_us_foreign_policy",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/us_foreign_policy",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/us_foreign_policy",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/us_foreign_policy",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_psychology",
+      "matched_task_name": "mmlu_high_school_psychology",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_psychology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_psychology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_psychology",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "college_mathematics",
+      "matched_task_name": "mmlu_college_mathematics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/college_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_mathematics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "conceptual_physics",
+      "matched_task_name": "mmlu_conceptual_physics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/conceptual_physics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/conceptual_physics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/conceptual_physics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "professional_psychology",
+      "matched_task_name": "mmlu_professional_psychology",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/professional_psychology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_psychology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_psychology",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "philosophy",
+      "matched_task_name": "mmlu_philosophy",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/philosophy",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/philosophy",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/philosophy",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "college_chemistry",
+      "matched_task_name": "mmlu_college_chemistry",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/college_chemistry",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_chemistry",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_chemistry",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "human_aging",
+      "matched_task_name": "mmlu_human_aging",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/human_aging",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/human_aging",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/human_aging",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "marketing",
+      "matched_task_name": "mmlu_marketing",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/marketing",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/marketing",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/marketing",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "professional_accounting",
+      "matched_task_name": "mmlu_professional_accounting",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/professional_accounting",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_accounting",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/professional_accounting",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "logical_fallacies",
+      "matched_task_name": "mmlu_logical_fallacies",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/logical_fallacies",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/logical_fallacies",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/logical_fallacies",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "global_facts",
+      "matched_task_name": "mmlu_global_facts",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/global_facts",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/global_facts",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/global_facts",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "abstract_algebra",
+      "matched_task_name": "mmlu_abstract_algebra",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/abstract_algebra",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/abstract_algebra",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/abstract_algebra",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_statistics",
+      "matched_task_name": "mmlu_high_school_statistics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_statistics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_statistics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_statistics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "virology",
+      "matched_task_name": "mmlu_virology",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/virology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/virology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/virology",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_chemistry",
+      "matched_task_name": "mmlu_high_school_chemistry",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_chemistry",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_chemistry",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_chemistry",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_biology",
+      "matched_task_name": "mmlu_high_school_biology",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_biology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_biology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_biology",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "college_biology",
+      "matched_task_name": "mmlu_college_biology",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/college_biology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_biology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_biology",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "nutrition",
+      "matched_task_name": "mmlu_nutrition",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/nutrition",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/nutrition",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/nutrition",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "computer_security",
+      "matched_task_name": "mmlu_computer_security",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/computer_security",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/computer_security",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/computer_security",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "college_physics",
+      "matched_task_name": "mmlu_college_physics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/college_physics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_physics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_physics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_physics",
+      "matched_task_name": "mmlu_high_school_physics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_physics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_physics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_physics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "college_medicine",
+      "matched_task_name": "mmlu_college_medicine",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/college_medicine",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_medicine",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/college_medicine",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "high_school_macroeconomics",
+      "matched_task_name": "mmlu_high_school_macroeconomics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/high_school_macroeconomics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_macroeconomics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/high_school_macroeconomics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu",
+      "config_name": "business_ethics",
+      "matched_task_name": "mmlu_business_ethics",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "mmlu/business_ethics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/business_ethics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/business_ethics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hellaswag",
+      "config_name": null,
+      "matched_task_name": "hellaswag",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "hellaswag",
+      "config_name": "test",
+      "matched_task_name": "hellaswag",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "hellaswag",
+      "config_name": "validation",
+      "matched_task_name": "hellaswag",
+      "output_type": "multiple_choice"
+    },
+    {
+      "dataset_path": "arc",
+      "config_name": "ARC-Challenge",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "arc/ARC-Challenge",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "arc/ARC-Challenge",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "arc",
+      "config_name": "ARC-Easy",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "arc/ARC-Easy",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "arc/ARC-Easy",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    }
+  ],
+  "does_not_require_logprobs": [
+    {
+      "dataset_path": "humaneval",
+      "config_name": null,
+      "matched_task_name": "humaneval",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "humaneval",
+      "config_name": "test",
+      "matched_task_name": "humaneval",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "triviaqa",
+      "config_name": "rc.nocontext",
+      "matched_task_name": "triviaqa",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "intermediate_algebra",
+      "matched_task_name": "hendrycks_math_intermediate_algebra",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "prealgebra",
+      "matched_task_name": "hendrycks_math_prealgebra",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "geometry",
+      "matched_task_name": "hendrycks_math_geometry",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "algebra",
+      "matched_task_name": "hendrycks_math_algebra",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "truthfulqa/generation",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "gsm8k",
+      "config_name": "main",
+      "matched_task_name": "gsm8k",
+      "output_type": "generate_until"
+    },
+    {
+      "dataset_path": "mmlu/medical_genetics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/medical_genetics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "mmlu/medical_genetics",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    }
+  ],
+  "unknown": [
+    {
+      "dataset_path": "super_glue",
+      "config_name": "record",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/record",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/record",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "multirc",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/multirc",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/multirc",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "copa",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/copa",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/copa",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "boolq",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/boolq",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/boolq",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "rte",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/rte",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/rte",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "wic",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/wic",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/wic",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "wsc.fixed",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/wsc.fixed",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/wsc.fixed",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue",
+      "config_name": "cb",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/cb",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "super_glue/cb",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "triviaqa/rc.nocontext",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "triviaqa/rc.nocontext",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "counting_and_probability",
+      "matched_task_name": "hendrycks_math",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/counting_and_probability",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/intermediate_algebra",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "number_theory",
+      "matched_task_name": "hendrycks_math",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/number_theory",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math",
+      "config_name": "precalculus",
+      "matched_task_name": "hendrycks_math",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/precalculus",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/prealgebra",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/geometry",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "hendrycks_math/algebra",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "truthfulqa",
+      "config_name": "multiple_choice",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "truthfulqa/multiple_choice",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "truthfulqa",
+      "config_name": "generation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "lambada",
+      "config_name": "default",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "lambada/default",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "business_administration",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/business_administration",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/business_administration",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/business_administration",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "art_studies",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/art_studies",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/art_studies",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/art_studies",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "sports_science",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/sports_science",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/sports_science",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/sports_science",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_geography",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_geography",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_geography",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_geography",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "probability_and_statistics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/probability_and_statistics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/probability_and_statistics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/probability_and_statistics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "plant_protection",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/plant_protection",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/plant_protection",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/plant_protection",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "chinese_language_and_literature",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/chinese_language_and_literature",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/chinese_language_and_literature",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/chinese_language_and_literature",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "environmental_impact_assessment_engineer",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/environmental_impact_assessment_engineer",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/environmental_impact_assessment_engineer",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/environmental_impact_assessment_engineer",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "discrete_mathematics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/discrete_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/discrete_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/discrete_mathematics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_politics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_politics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_politics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_politics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "advanced_mathematics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/advanced_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/advanced_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/advanced_mathematics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "college_economics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_economics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_economics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_economics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "tax_accountant",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/tax_accountant",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/tax_accountant",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/tax_accountant",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "basic_medicine",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/basic_medicine",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/basic_medicine",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/basic_medicine",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "operating_system",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/operating_system",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/operating_system",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/operating_system",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "computer_network",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/computer_network",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/computer_network",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/computer_network",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "metrology_engineer",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/metrology_engineer",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/metrology_engineer",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/metrology_engineer",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "law",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/law",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/law",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/law",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "education_science",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/education_science",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/education_science",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/education_science",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "urban_and_rural_planner",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/urban_and_rural_planner",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/urban_and_rural_planner",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/urban_and_rural_planner",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "college_programming",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_programming",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_programming",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_programming",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "legal_professional",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/legal_professional",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/legal_professional",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/legal_professional",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "logic",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/logic",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/logic",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/logic",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_geography",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_geography",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_geography",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_geography",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "clinical_medicine",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/clinical_medicine",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/clinical_medicine",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/clinical_medicine",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "ideological_and_moral_cultivation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/ideological_and_moral_cultivation",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/ideological_and_moral_cultivation",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/ideological_and_moral_cultivation",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_mathematics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_mathematics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_history",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_history",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_history",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_history",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "modern_chinese_history",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/modern_chinese_history",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/modern_chinese_history",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/modern_chinese_history",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_mathematics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_mathematics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_mathematics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_mathematics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "teacher_qualification",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/teacher_qualification",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/teacher_qualification",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/teacher_qualification",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "accountant",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/accountant",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/accountant",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/accountant",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_history",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_history",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_history",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_history",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "mao_zedong_thought",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/mao_zedong_thought",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/mao_zedong_thought",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/mao_zedong_thought",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_chemistry",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_chemistry",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_chemistry",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_chemistry",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_politics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_politics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_politics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_politics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "college_chemistry",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_chemistry",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_chemistry",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_chemistry",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "marxism",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/marxism",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/marxism",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/marxism",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "computer_architecture",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_biology",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_biology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_biology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_biology",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "veterinary_medicine",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/veterinary_medicine",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/veterinary_medicine",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/veterinary_medicine",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_chemistry",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_chemistry",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_chemistry",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_chemistry",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_biology",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_biology",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_biology",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_biology",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "professional_tour_guide",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/professional_tour_guide",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/professional_tour_guide",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/professional_tour_guide",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "physician",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/physician",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/physician",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/physician",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "electrical_engineer",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/electrical_engineer",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/electrical_engineer",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/electrical_engineer",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "fire_engineer",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/fire_engineer",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/fire_engineer",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/fire_engineer",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "college_physics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_physics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_physics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/college_physics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_physics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_physics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_physics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_physics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "high_school_chinese",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_chinese",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_chinese",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/high_school_chinese",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "civil_servant",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/civil_servant",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/civil_servant",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/civil_servant",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval",
+      "config_name": "middle_school_physics",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_physics",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_physics",
+      "config_name": "dev",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "ceval/middle_school_physics",
+      "config_name": "val",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "2wikimqa",
+      "matched_task_name": "longbench_2wikimqa",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/2wikimqa",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "multifieldqa_zh",
+      "matched_task_name": "longbench_multifieldqa_zh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/multifieldqa_zh",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "trec",
+      "matched_task_name": "longbench_trec",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/trec",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "lsht",
+      "matched_task_name": "longbench_lsht",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/lsht",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "samsum",
+      "matched_task_name": "longbench_samsum",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/samsum",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "dureader",
+      "matched_task_name": "longbench_dureader",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/dureader",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "triviaqa",
+      "matched_task_name": "longbench_triviaqa",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/triviaqa",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "qasper",
+      "matched_task_name": "longbench_qasper",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/qasper",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "passage_retrieval_en_e",
+      "matched_task_name": "longbench_passage_retrieval_en_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/passage_retrieval_en_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "multi_news_e",
+      "matched_task_name": "longbench_multi_news_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/multi_news_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "trec_e",
+      "matched_task_name": "longbench_trec_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/trec_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "passage_count",
+      "matched_task_name": "longbench_passage_count",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/passage_count",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "qasper_e",
+      "matched_task_name": "longbench_qasper_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/qasper_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "multifieldqa_en",
+      "matched_task_name": "longbench_multifieldqa_en",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/multifieldqa_en",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "hotpotqa",
+      "matched_task_name": "longbench_hotpotqa",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/hotpotqa",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "musique",
+      "matched_task_name": "longbench_musique",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/musique",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "repobench-p",
+      "matched_task_name": "longbench_repobench-p",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/repobench-p",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "2wikimqa_e",
+      "matched_task_name": "longbench_2wikimqa_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/2wikimqa_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "qmsum",
+      "matched_task_name": "longbench_qmsum",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/qmsum",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "passage_retrieval_en",
+      "matched_task_name": "longbench_passage_retrieval_en",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/passage_retrieval_en",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "multifieldqa_en_e",
+      "matched_task_name": "longbench_multifieldqa_en_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/multifieldqa_en_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "lcc_e",
+      "matched_task_name": "longbench_lcc_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/lcc_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "narrativeqa",
+      "matched_task_name": "longbench_narrativeqa",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/narrativeqa",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "lcc",
+      "matched_task_name": "longbench_lcc",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/lcc",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "passage_count_e",
+      "matched_task_name": "longbench_passage_count_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/passage_count_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "hotpotqa_e",
+      "matched_task_name": "longbench_hotpotqa_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/hotpotqa_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "multi_news",
+      "matched_task_name": "longbench_multi_news",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/multi_news",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "samsum_e",
+      "matched_task_name": "longbench_samsum_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/samsum_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "repobench-p_e",
+      "matched_task_name": "longbench_repobench-p_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/repobench-p_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "gov_report",
+      "matched_task_name": "longbench_gov_report",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/gov_report",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "passage_retrieval_zh",
+      "matched_task_name": "longbench_passage_retrieval_zh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/passage_retrieval_zh",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "vcsum",
+      "matched_task_name": "longbench_vcsum",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/vcsum",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "triviaqa_e",
+      "matched_task_name": "longbench_triviaqa_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/triviaqa_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench",
+      "config_name": "gov_report_e",
+      "matched_task_name": "longbench_gov_report_e",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "longbench/gov_report_e",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.el",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.el",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.ro",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.ro",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.ru",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.ru",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.vi",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.vi",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.en",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.en",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.es",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.es",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.tr",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.tr",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.th",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.th",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.zh",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.zh",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.de",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.de",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.hi",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.hi",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad",
+      "config_name": "xquad.ar",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "xquad/xquad.ar",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "openbookqa/main",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "openbookqa/main",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "agieval",
+      "config_name": null,
+      "matched_task_name": "agieval",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "agieval",
+      "config_name": "test",
+      "matched_task_name": "agieval",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "gsm8k/main",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "wikitext/wikitext-2-raw-v1",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "wikitext/wikitext-2-raw-v1",
+      "config_name": "validation",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "logical_deduction_three_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/logical_deduction_three_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "tracking_shuffled_objects_five_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/tracking_shuffled_objects_five_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "web_of_lies",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/web_of_lies",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "tracking_shuffled_objects_seven_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/tracking_shuffled_objects_seven_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "date_understanding",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/date_understanding",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "navigate",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/navigate",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "multistep_arithmetic_two",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/multistep_arithmetic_two",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "boolean_expressions",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/boolean_expressions",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "hyperbaton",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/hyperbaton",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "tracking_shuffled_objects_three_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/tracking_shuffled_objects_three_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "sports_understanding",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/sports_understanding",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "logical_deduction_seven_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/logical_deduction_seven_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "causal_judgement",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/causal_judgement",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "penguins_in_a_table",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/penguins_in_a_table",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "geometric_shapes",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/geometric_shapes",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "reasoning_about_colored_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/reasoning_about_colored_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "dyck_languages",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/dyck_languages",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "disambiguation_qa",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/disambiguation_qa",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "salient_translation_error_detection",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/salient_translation_error_detection",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "movie_recommendation",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/movie_recommendation",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "snarks",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/snarks",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "formal_fallacies",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/formal_fallacies",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "logical_deduction_five_objects",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/logical_deduction_five_objects",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "temporal_sequences",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/temporal_sequences",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "word_sorting",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/word_sorting",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "ruin_names",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/ruin_names",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh",
+      "config_name": "object_counting",
+      "matched_task_name": "bbh",
+      "output_type": "unknown"
+    },
+    {
+      "dataset_path": "bbh/object_counting",
+      "config_name": "test",
+      "matched_task_name": null,
+      "output_type": "unknown"
+    }
+  ]
+}

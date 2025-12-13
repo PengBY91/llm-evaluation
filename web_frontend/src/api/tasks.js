@@ -49,11 +49,6 @@ export const tasksApi = {
   // 获取可用任务列表
   getAvailableTasks() {
     return api.get('/tasks/available-tasks/list')
-  },
-  
-  // 修复任务名称
-  fixTaskNames() {
-    return api.post('/tasks/fix-task-names')
   }
 }
 

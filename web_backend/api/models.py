@@ -140,10 +140,33 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     base_url = f"{base_url}:{port}"
         
-        # 如果 base_url 不包含路径，根据模型类型自动添加默认路径
-        # 注意：OpenAI 兼容 API（包括 Ollama、vLLM）通常使用 /v1/chat/completions 或 /v1/completions
+        # DeepSeek API 特殊处理：如果包含 api.deepseek.com，不要自动添加 /v1/chat/completions 后缀
+        # 因为 DeepSeek 的 base_url 通常是 https://api.deepseek.com
+        # 如果自动添加后缀，可能会变成 https://api.deepseek.com/v1/chat/completions/v1/chat/completions
+        # lm-eval 库会自动处理 endpoint，我们只需要提供 base URL
+        
+        # 修正：对于 DeepSeek API，base_url 应该是 https://api.deepseek.com
+        # lm-eval 库内部会自动调用 /chat/completions 端点
+        # 但如果我们在这里添加了 /v1/chat/completions，lm-eval 可能会调用 https://api.deepseek.com/v1/chat/completions/chat/completions
+        
+        # 实际上，lm-eval 的 openai 接口需要的是 base_url，它会自动添加 /chat/completions (如果需要)
+        # 但是，这取决于 lm-eval 版本和具体的接口实现。
+        # 观察用户报错：Invalid URL (POST /v1) - 这表明请求发往了 /v1 而不是完整的 URL
+        # 这通常意味着 base_url 解析有问题，或者 lm-eval 期望 base_url 不包含路径
+        
+        # 让我们检查一下 urlparse 的行为
         from urllib.parse import urlparse
         parsed = urlparse(base_url)
+        
+        # 如果 base_url 已经是完整的 API 端点（例如 https://api.deepseek.com/chat/completions），
+        # 某些客户端可能会再次追加路径。
+        # 但通常 base_url 应该是 https://api.deepseek.com/v1 或 https://api.deepseek.com
+        
+        # 针对 DeepSeek 的官方文档，base_url 是 https://api.deepseek.com
+        # 如果用户填写的是 https://api.deepseek.com，我们可能不需要自动添加 /v1/chat/completions
+        # 或者我们需要添加 /v1，变成 https://api.deepseek.com/v1
+        
+        # 如果 base_url 不包含路径，根据模型类型自动添加默认路径
         if not parsed.path or parsed.path == "/":
             # 根据模型类型添加默认路径
             if model_type == "openai-chat-completions":

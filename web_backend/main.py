@@ -9,6 +9,11 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 import uvicorn
+import sys
+import os
+
+# 将项目根目录添加到 python path，以便导入 lm_eval
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from api import tasks, datasets, models
 
