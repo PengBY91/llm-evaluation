@@ -156,7 +156,7 @@
             value-key="id"
           >
             <el-option 
-              v-for="dataset in availableTasks" 
+              v-for="dataset in availableTasks.filter(d => d.task_name)" 
               :key="dataset.id" 
               :label="getDatasetLabel(dataset)" 
               :value="dataset"
@@ -197,6 +197,12 @@
           </el-select>
           <div v-if="loadingAvailableTasks" style="font-size: 12px; color: #999; margin-top: 5px;">
             正在从 /data 目录加载数据集...
+          </div>
+          <div v-else-if="availableTasks.length > 0" style="font-size: 12px; color: #999; margin-top: 5px;">
+            共 {{ availableTasks.length }} 个数据集，其中 {{ availableTasks.filter(d => d.task_name).length }} 个可用于创建评测任务 
+            <span v-if="availableTasks.filter(d => !d.task_name).length > 0">
+              （{{ availableTasks.filter(d => !d.task_name).length }} 个未匹配到任务，已禁用）
+            </span>
           </div>
           <div v-else-if="availableTasks.length === 0" style="font-size: 12px; color: #999; margin-top: 5px;">
             点击下拉框加载 /data 目录下的数据集

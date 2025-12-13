@@ -216,9 +216,13 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
                 continue
             
             # 检查是否是有效数据集
-            if any(f.endswith('.arrow') for f in files) or \
-               'dataset_info.json' in files or 'dataset_dict.json' in files:
-                
+            has_dataset_dict = 'dataset_dict.json' in files
+            has_dataset_info = 'dataset_info.json' in files
+            has_arrow = any(f.endswith('.arrow') for f in files)
+            
+            is_potential_dataset = has_dataset_dict or has_dataset_info or has_arrow
+
+            if is_potential_dataset:
                 try:
                     rel_path = root_path.relative_to(DATA_DIR)
                     parts = rel_path.parts
@@ -244,6 +248,11 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
                              
                 except Exception:
                     pass
+
+            # 如果当前目录被识别为数据集（无论是否成功解析路径），则不再遍历其子目录
+            # 这可以防止将数据集的子文件夹（如 splits, checkpoints）误识别为独立数据集
+            if is_potential_dataset:
+                dirs[:] = []
 
     # 2. 从 TaskManager 获取所有任务，并匹配本地数据
     try:
