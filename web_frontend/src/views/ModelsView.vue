@@ -224,7 +224,6 @@ const loadModelTypes = async () => {
     const response = await modelsApi.getModelTypes()
     modelTypes.value = response.model_types || []
   } catch (error) {
-    console.error('加载模型类型失败:', error)
     // 使用默认类型
     modelTypes.value = [
       { value: 'openai-chat-completions', label: 'OpenAI Chat Completions', description: 'OpenAI 兼容的聊天完成 API（支持 Ollama、vLLM 等）' },
@@ -346,8 +345,6 @@ const saveModel = async () => {
       return
     }
     
-    console.log('准备保存模型数据:', cleanData)
-    
     if (editingModel.value) {
       await modelsApi.updateModel(editingModel.value.id, cleanData)
       ElMessage.success('模型更新成功')
@@ -361,77 +358,32 @@ const saveModel = async () => {
     editingModel.value = null
     loadModels()
   } catch (error) {
-    if (error !== false) { // 验证失败时 error 为 false
-      // 改进错误信息显示
-      console.error('保存模型失败，完整错误信息:', error)
-      console.error('错误类型:', typeof error)
-      console.error('错误对象:', JSON.stringify(error, null, 2))
-      
+    if (error !== false) {
       let errorMessage = '保存模型失败'
       if (error) {
         if (error instanceof Error) {
-          const msg = error.message || '未知错误'
-          errorMessage += ': ' + msg
-          console.error('Error.message:', msg)
+          errorMessage += ': ' + (error.message || '未知错误')
         } else if (typeof error === 'string') {
           errorMessage += ': ' + error
         } else if (error.message) {
           errorMessage += ': ' + error.message
-          console.error('error.message:', error.message)
         } else if (error.detail) {
-          // 处理 FastAPI 验证错误
           if (Array.isArray(error.detail)) {
             const details = error.detail.map(err => {
-              if (typeof err === 'object') {
-                if (err.loc && err.msg) {
-                  return `${err.loc.join('.')}: ${err.msg}`
-                } else if (err.field) {
-                  return `字段 ${err.field} 验证失败`
-                }
+              if (typeof err === 'object' && err.loc && err.msg) {
+                return `${err.loc.join('.')}: ${err.msg}`
               }
               return String(err)
             }).join(', ')
             errorMessage += ': ' + details
           } else if (typeof error.detail === 'string') {
             errorMessage += ': ' + error.detail
-          } else if (typeof error.detail === 'object') {
-            // 处理对象格式的错误
-            const detailKeys = Object.keys(error.detail)
-            const detailMessages = detailKeys.map(key => {
-              const value = error.detail[key]
-              if (Array.isArray(value)) {
-                return `${key}: ${value.map(v => typeof v === 'object' ? (v.msg || JSON.stringify(v)) : v).join(', ')}`
-              }
-              return `${key}: ${value}`
-            }).join('; ')
-            errorMessage += ': ' + detailMessages
-          } else {
-            errorMessage += ': ' + JSON.stringify(error.detail)
+          } else if (error.response?.data?.detail) {
+            errorMessage += ': ' + (error.response.data.detail || error.response.data.message || '未知错误')
           }
-          console.error('error.detail:', error.detail)
-        } else if (error.response && error.response.data) {
-          const data = error.response.data
-          if (data.detail) {
-            if (Array.isArray(data.detail)) {
-              const details = data.detail.map(err => {
-                if (typeof err === 'object' && err.loc && err.msg) {
-                  return `${err.loc.join('.')}: ${err.msg}`
-                }
-                return String(err)
-              }).join(', ')
-              errorMessage += ': ' + details
-            } else {
-              errorMessage += ': ' + (data.detail || data.message || '未知错误')
-            }
-          } else {
-            errorMessage += ': ' + (data.message || '未知错误')
-          }
-          console.error('error.response.data:', data)
-        } else {
-          errorMessage += ': 未知错误，请查看控制台获取详细信息'
+        } else if (error.response?.data) {
+          errorMessage += ': ' + (error.response.data.detail || error.response.data.message || '未知错误')
         }
-      } else {
-        errorMessage += ': 未知错误'
       }
       ElMessage.error(errorMessage)
     }
@@ -448,23 +400,8 @@ const deleteModel = async (modelId) => {
     loadModels()
   } catch (error) {
     if (error !== 'cancel') {
-      // 改进错误信息显示
-      let errorMessage = '删除模型失败'
-      if (error) {
-        if (error instanceof Error) {
-          errorMessage += ': ' + error.message
-        } else if (typeof error === 'string') {
-          errorMessage += ': ' + error
-        } else if (error.message) {
-          errorMessage += ': ' + error.message
-        } else if (error.detail) {
-          errorMessage += ': ' + error.detail
-        } else {
-          errorMessage += ': 未知错误'
-        }
-      }
-      ElMessage.error(errorMessage)
-      console.error('删除模型失败:', error)
+      const errorMsg = error?.detail || error?.message || '未知错误'
+      ElMessage.error('删除模型失败: ' + errorMsg)
     }
   }
 }
@@ -511,26 +448,8 @@ const testModelConnection = async (model) => {
       ElMessage.error(`模型 "${model.name}" 连接测试失败: ${result.message}`)
     }
   } catch (error) {
-    let errorMessage = '连接测试失败'
-    if (error) {
-      if (error instanceof Error) {
-        errorMessage += ': ' + (error.message || '未知错误')
-      } else if (typeof error === 'string') {
-        errorMessage += ': ' + error
-      } else if (error.message) {
-        errorMessage += ': ' + error.message
-      } else if (error.detail) {
-        if (typeof error.detail === 'string') {
-          errorMessage += ': ' + error.detail
-        } else {
-          errorMessage += ': ' + JSON.stringify(error.detail)
-        }
-      } else {
-        errorMessage += ': 未知错误'
-      }
-    }
-    ElMessage.error(`模型 "${model.name}" ${errorMessage}`)
-    console.error('测试模型连接失败:', error)
+    const errorMsg = error?.detail || error?.message || '未知错误'
+    ElMessage.error(`模型 "${model.name}" 连接测试失败: ${errorMsg}`)
   } finally {
     testingModels.value[model.id] = false
   }

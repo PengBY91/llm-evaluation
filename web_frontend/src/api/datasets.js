@@ -31,11 +31,6 @@ export const datasetsApi = {
   // 刷新缓存
   refreshCache() {
     return api.post('/datasets/refresh-cache')
-  },
-  
-  // 修复任务名称
-  fixTaskNames() {
-    return api.post('/datasets/fix-task-names')
   }
 }
 

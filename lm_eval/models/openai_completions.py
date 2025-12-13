@@ -67,7 +67,28 @@ class LocalCompletionsAPI(TemplateAPI):
         eos=None,
         **kwargs,
     ) -> dict:
+        # 检测是否是 Ollama 服务器
+        is_ollama = False
+        if self.base_url:
+            if ":11434" in self.base_url or "ollama" in self.base_url.lower():
+                is_ollama = True
+        
+        # 对于 Ollama，确保 prompt 是字符串
+        # Ollama 的 API 不支持数组格式的 prompt
+        prompt = messages
+        if is_ollama:
+            if isinstance(messages, list):
+                # 如果是列表，取第一个元素（通常是字符串）
+                if len(messages) > 0:
+                    prompt = messages[0] if isinstance(messages[0], str) else str(messages[0])
+                else:
+                    prompt = ""
+            elif not isinstance(messages, str):
+                # 如果不是字符串也不是列表，转换为字符串
+                prompt = str(messages)
+        
         if generate:
+            gen_kwargs = gen_kwargs or {}
             gen_kwargs.pop("do_sample", False)
             if "max_tokens" in gen_kwargs:
                 max_tokens = gen_kwargs.pop("max_tokens")
@@ -76,7 +97,7 @@ class LocalCompletionsAPI(TemplateAPI):
             temperature = gen_kwargs.pop("temperature", 0)
             stop = handle_stop_sequences(gen_kwargs.pop("until", None), eos)
             return {
-                "prompt": messages,
+                "prompt": prompt,
                 "model": self.model,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
@@ -87,7 +108,7 @@ class LocalCompletionsAPI(TemplateAPI):
         else:
             return {
                 "model": self.model,
-                "prompt": messages,
+                "prompt": prompt,
                 "temperature": 0,
                 "max_tokens": 1,
                 "logprobs": 1,
@@ -279,6 +300,25 @@ class OpenAICompletionsAPI(LocalCompletionsAPI):
         return key
 
     def loglikelihood(self, requests, **kwargs):
+        # 检测是否是 Ollama 服务器
+        # Ollama 默认使用端口 11434，这是最可靠的检测方法
+        is_ollama = False
+        if self.base_url:
+            base_url_lower = self.base_url.lower()
+            # 检查端口 11434（Ollama 的默认端口）
+            if ":11434" in self.base_url:
+                is_ollama = True
+            # 检查 URL 中是否包含 "ollama"
+            elif "ollama" in base_url_lower:
+                is_ollama = True
+        
+        if is_ollama:
+            raise NotImplementedError(
+                "Ollama API does not support logprobs parameter, so loglikelihood tasks are not supported. "
+                "Please use 'generate_until' type tasks (e.g., 'mmlu_generative' instead of 'mmlu') instead. "
+                "See https://github.com/ollama/ollama/issues/2415 for more information."
+            )
+        
         assert self.model in [
             "babbage-002",
             "davinci-002",

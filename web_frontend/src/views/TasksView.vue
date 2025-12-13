@@ -4,14 +4,6 @@
       <h2>评测任务管理</h2>
       <div>
         <el-button 
-          type="warning" 
-          @click="handleFixTaskNames"
-          :loading="fixingTaskNames"
-          style="margin-right: 10px;"
-        >
-          修复任务名称
-        </el-button>
-        <el-button 
           type="primary" 
           @click="handleCreateTaskClick"
           :loading="loadingAvailableTasks"
@@ -128,7 +120,11 @@
           />
         </el-form-item>
         <el-form-item label="模型类型" required>
-          <el-select v-model="taskForm.model" placeholder="请选择模型类型">
+          <el-select 
+            v-model="taskForm.model" 
+            placeholder="请选择模型类型"
+            @change="handleModelTypeChange"
+          >
             <el-option label="OpenAI Chat Completions" value="openai-chat-completions" />
             <el-option label="OpenAI Completions" value="openai-completions" />
             <el-option label="HuggingFace" value="hf" />
@@ -152,14 +148,37 @@
               :key="dataset.uniqueKey" 
               :label="getDatasetLabel(dataset)" 
               :value="dataset"
+              :disabled="!dataset.hasTaskName || !isTaskCompatibleWithModel(dataset)"
+              :class="{ 'task-option-incompatible': dataset.hasTaskName && !isTaskCompatibleWithModel(dataset) }"
             >
               <div>
-                <div>{{ getDatasetLabel(dataset) }}</div>
-                <div style="font-size: 12px; color: #999;" v-if="dataset.task_name">
+                <div :style="dataset.hasTaskName && !isTaskCompatibleWithModel(dataset) ? { color: '#909399' } : {}">
+                  {{ getDatasetLabel(dataset) }}
+                  <el-tag v-if="!dataset.hasTaskName" size="small" type="warning" style="margin-left: 8px;">
+                    无任务名称
+                  </el-tag>
+                  <el-tag 
+                    v-else-if="!isTaskCompatibleWithModel(dataset)" 
+                    size="small" 
+                    type="info" 
+                    style="margin-left: 8px;"
+                  >
+                    不支持当前模型类型
+                  </el-tag>
+                </div>
+                <div 
+                  style="font-size: 12px; color: #999;" 
+                  v-if="dataset.task_name"
+                  :style="dataset.hasTaskName && !isTaskCompatibleWithModel(dataset) ? { color: '#c0c4cc' } : {}"
+                >
                   任务: {{ dataset.task_name }}
+                  <span v-if="dataset.output_type" style="margin-left: 8px;">
+                    ({{ dataset.output_type }})
+                  </span>
                 </div>
                 <div style="font-size: 12px; color: #999;" v-else-if="dataset.path">
                   {{ dataset.path }}
+                  <span style="color: #f56c6c;">（未匹配到任务，无法创建评测任务）</span>
                 </div>
               </div>
             </el-option>
@@ -169,6 +188,12 @@
           </div>
           <div v-else-if="availableTasks.length === 0" style="font-size: 12px; color: #999; margin-top: 5px;">
             点击下拉框加载 /data 目录下的数据集
+          </div>
+          <div v-else style="font-size: 12px; color: #999; margin-top: 5px;">
+            共 {{ availableTasks.length }} 个数据集，其中 {{ availableTasks.filter(d => d.hasTaskName).length }} 个可用于创建评测任务
+            <span v-if="availableTasks.filter(d => !d.hasTaskName).length > 0">
+              （{{ availableTasks.filter(d => !d.hasTaskName).length }} 个未匹配到任务，已禁用）
+            </span>
           </div>
         </el-form-item>
         <el-form-item label="Few-shot数量">
@@ -255,10 +280,44 @@ const showDetailDialog = ref(false)
 const currentTask = ref(null)
 const modelArgsStr = ref('{}')
 const loadingAvailableTasks = ref(false)
-const fixingTaskNames = ref(false)
 const taskFilterKeyword = ref('')  // 用于存储过滤关键词
 
 const selectedModelId = ref(null)
+
+// 检查任务是否支持当前选择的模型类型
+const isTaskCompatibleWithModel = (dataset) => {
+  // 如果没有选择模型类型，默认允许
+  if (!taskForm.value.model) {
+    return true
+  }
+  
+  // 如果任务没有 task_name，不兼容（已被禁用）
+  if (!dataset.hasTaskName || !dataset.task_name) {
+    return false
+  }
+  
+  // 如果没有 output_type 信息，暂时允许（稍后后端会检查）
+  if (!dataset.output_type) {
+    return true
+  }
+  
+  const modelType = taskForm.value.model
+  const outputType = dataset.output_type
+  
+  // openai-chat-completions 不支持需要 loglikelihood 的任务
+  if (modelType === 'openai-chat-completions') {
+    // 只支持 generate_until 类型
+    return outputType === 'generate_until'
+  }
+  
+  // openai-completions 和 hf 支持所有类型（但 openai-completions 对模型有限制，这由后端检查）
+  if (modelType === 'openai-completions' || modelType === 'hf') {
+    return true
+  }
+  
+  // 其他模型类型，默认支持 generate_until
+  return outputType === 'generate_until'
+}
 
 // 生成数据集的唯一键（用于 el-select 的 value-key）
 const getDatasetUniqueKey = (dataset) => {
@@ -300,7 +359,7 @@ const loadModels = async () => {
   try {
     models.value = await modelsApi.getModels()
   } catch (error) {
-    console.error('加载模型列表失败:', error)
+    // 静默失败，不影响主流程
   }
 }
 
@@ -390,6 +449,10 @@ const handleModelSelect = async (modelId) => {
     taskForm.value.model_id = null
     taskForm.value.model_args = {}
     modelArgsStr.value = '{}'
+    // 清除已选择的不兼容任务
+    taskForm.value.tasks = taskForm.value.tasks.filter(task => 
+      isTaskCompatibleWithModel(typeof task === 'object' ? task : { task_name: task })
+    )
     return
   }
   
@@ -397,12 +460,21 @@ const handleModelSelect = async (modelId) => {
     // 从模型列表中找到选中的模型，获取其 model_type
     const selectedModel = models.value.find(m => m.id === modelId)
     if (selectedModel) {
+      const oldModelType = taskForm.value.model
       taskForm.value.model = selectedModel.model_type
       taskForm.value.model_id = modelId
       
       // 如果是 chat completions，自动启用 chat template
       if (selectedModel.model_type === 'openai-chat-completions') {
         taskForm.value.apply_chat_template = true
+      }
+      
+      // 如果模型类型改变，清除已选择的不兼容任务
+      if (oldModelType !== selectedModel.model_type) {
+        taskForm.value.tasks = taskForm.value.tasks.filter(task => {
+          const taskObj = typeof task === 'object' ? task : { task_name: task, hasTaskName: true }
+          return isTaskCompatibleWithModel(taskObj)
+        })
       }
       
       // 构建模型参数的预览（后端会从 model_id 自动构建，这里只是预览）
@@ -424,7 +496,6 @@ const handleModelSelect = async (modelId) => {
       ElMessage.warning('未找到选中的模型')
     }
   } catch (error) {
-    console.error('加载模型配置失败:', error)
     ElMessage.error('加载模型配置失败: ' + (error.message || '未知错误'))
   }
 }
@@ -580,37 +651,6 @@ const stopTask = async (taskId) => {
   }
 }
 
-const handleFixTaskNames = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '此操作将修复所有任务中错误的任务名称（如 gsm8k_main -> gsm8k）。是否继续？',
-      '确认修复',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消'
-      }
-    )
-    
-    fixingTaskNames.value = true
-    const response = await tasksApi.fixTaskNames()
-    
-    if (response.fixed_count > 0) {
-      ElMessage.success(`成功修复 ${response.fixed_count} 个任务的任务名称`)
-      // 重新加载任务列表
-      loadTasks()
-    } else {
-      ElMessage.info('未发现需要修复的任务名称')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('修复任务名称失败: ' + (error.message || '未知错误'))
-    }
-  } finally {
-    fixingTaskNames.value = false
-  }
-}
-
 const getStatusType = (status) => {
   const map = {
     pending: 'info',
@@ -722,9 +762,7 @@ const loadAvailableTasks = async () => {
         page_size: pageSize
       })
       
-      // 检查响应数据结构
       if (!response || !response.datasets) {
-        console.warn('数据集 API 返回数据格式异常:', response)
         break
       }
       
@@ -745,28 +783,27 @@ const loadAvailableTasks = async () => {
     }
     
     // 过滤并确保所有数据集都有正确的 name 字段和唯一键
-    // 重要：只保留有 task_name 的数据集（task_name 是必需的，用于创建任务）
+    // 注意：显示所有数据集，包括没有 task_name 的（但会在创建任务时进行检查）
     const validDatasets = allDatasets
       .filter(dataset => {
-        // 过滤无效数据，并且必须有 task_name（用于创建任务）
+        // 只过滤完全无效的数据
         if (!dataset || (!dataset.name && !dataset.task_name && !dataset.path)) {
           return false
         }
-        // 必须有 task_name，否则无法创建任务
-        if (!dataset.task_name) {
-          console.warn(`数据集 "${dataset.name || dataset.path}" 没有 task_name，将被过滤掉`)
-          return false
-        }
+        // 不再过滤没有 task_name 的数据集，允许用户看到所有数据集
+        // 如果没有 task_name，会在创建任务时给出错误提示
         return true
       })
       .map(dataset => {
         // 确保 name 字段存在（用于显示）
         if (!dataset.name) {
-          // 如果没有 name，使用 task_name 作为显示名称
-          dataset.name = dataset.task_name
+          // 如果没有 name，优先使用 task_name，否则使用 path
+          dataset.name = dataset.task_name || dataset.path || 'unknown'
         }
         // 添加唯一键字段（用于 value-key 和去重）
         dataset.uniqueKey = getDatasetUniqueKey(dataset)
+        // 标记是否有 task_name（用于 UI 显示）
+        dataset.hasTaskName = !!dataset.task_name
         return dataset
       })
     
@@ -792,8 +829,6 @@ const loadAvailableTasks = async () => {
       ElMessage.warning('/data 目录下没有找到数据集，请先下载数据集')
     }
   } catch (error) {
-    console.error('加载数据集列表失败:', error)
-    // 改进错误信息显示
     let errorMessage = '加载数据集列表失败'
     if (error) {
       if (error instanceof Error) {
@@ -829,6 +864,16 @@ const handleTaskSelectFocus = () => {
   // 当获得焦点时，如果还没有加载数据，则加载
   if (availableTasks.value.length === 0 && !loadingAvailableTasks.value) {
     loadAvailableTasks()
+  }
+}
+
+const handleModelTypeChange = () => {
+  // 当模型类型改变时，清除已选择的不兼容任务
+  if (taskForm.value.tasks && taskForm.value.tasks.length > 0) {
+    taskForm.value.tasks = taskForm.value.tasks.filter(task => {
+      const taskObj = typeof task === 'object' ? task : { task_name: task, hasTaskName: true }
+      return isTaskCompatibleWithModel(taskObj)
+    })
   }
 }
 
@@ -872,6 +917,19 @@ pre {
   padding: 10px;
   border-radius: 4px;
   overflow-x: auto;
+}
+
+/* 不兼容任务的样式 */
+:deep(.task-option-incompatible) {
+  color: #909399 !important;
+}
+
+:deep(.task-option-incompatible .el-select-dropdown__item) {
+  color: #909399 !important;
+}
+
+:deep(.task-option-incompatible.is-disabled) {
+  color: #c0c4cc !important;
 }
 </style>
 

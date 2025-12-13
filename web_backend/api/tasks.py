@@ -14,10 +14,6 @@ from pathlib import Path
 import threading
 import lm_eval
 from lm_eval.tasks import TaskManager
-import sys
-import os
-# 导入模型相关的函数
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from api.models import get_model_args, load_model_from_file
 
 router = APIRouter()
@@ -51,8 +47,7 @@ def load_task_from_file(task_id: str) -> Optional[Dict[str, Any]]:
         try:
             with open(task_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"加载任务文件失败 {task_id}: {e}")
+        except Exception:
             return None
     return None
 
@@ -66,8 +61,8 @@ def load_all_tasks_from_files():
             task_data = load_task_from_file(task_id)
             if task_data:
                 tasks[task_id] = task_data
-        except Exception as e:
-            print(f"加载任务文件失败 {task_id}: {e}")
+        except Exception:
+            pass
     return tasks
 
 
@@ -137,67 +132,39 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             try:
                 model_data = load_model_from_file(request.model_id)
                 if model_data:
-                    # 使用 get_model_args 重新构建 model_args，确保 base_url 包含正确路径
-                    from api.models import get_model_args
                     rebuilt_model_args = get_model_args(model_data)
-                    # 合并原有的 model_args（保留用户自定义的参数）
                     rebuilt_model_args.update(request.model_args)
                     request.model_args = rebuilt_model_args
-                    print(f"[DEBUG] 从模型文件重新构建 model_args，base_url: {request.model_args.get('base_url')}")
-                else:
-                    print(f"[WARNING] 无法加载模型文件 {request.model_id}")
-            except Exception as e:
-                print(f"[ERROR] 加载模型文件 {request.model_id} 失败: {e}")
+            except Exception:
+                pass
         
         # 从模型文件或 model_args 中读取 api_key
         original_api_key = None
         api_key = None
         
-        # 优先从 model_id 加载 api_key（直接从模型文件读取，确保使用最新的）
+        # 优先从 model_id 加载 api_key
         if request.model_id:
             try:
                 model_data = load_model_from_file(request.model_id)
-                if model_data:
-                    if model_data.get("api_key"):
-                        api_key = model_data["api_key"]
-                        print(f"[DEBUG] 从模型文件 {request.model_id} 读取 api_key: {api_key[:10] if len(api_key) > 10 else '***'}...")
-                    else:
-                        print(f"[WARNING] 模型文件 {request.model_id} 中没有 api_key 字段")
-                else:
-                    print(f"[WARNING] 无法加载模型文件 {request.model_id}")
-            except Exception as e:
-                print(f"[ERROR] 加载模型文件 {request.model_id} 失败: {e}")
+                if model_data and model_data.get("api_key"):
+                    api_key = model_data["api_key"]
+            except Exception:
+                pass
         
         # 如果 model_args 中有 api_key，也检查它（但 model_id 的优先级更高）
         if not api_key and "api_key" in request.model_args:
             api_key_from_args = request.model_args["api_key"]
-            # 忽略预览文本和无效值
             if (api_key_from_args and 
-                api_key_from_args != "(已保存，后端会自动使用)" and 
-                api_key_from_args != "(未设置)" and
+                api_key_from_args not in ["(已保存，后端会自动使用)", "(未设置)"] and
                 isinstance(api_key_from_args, str) and
-                len(api_key_from_args) > 10):  # 真实的 api_key 应该比较长
+                len(api_key_from_args) > 10):
                 api_key = api_key_from_args
-                print(f"[DEBUG] 从 model_args 读取 api_key: {api_key[:10]}...")
         
-        # 确保 model_args 中包含 api_key（用于传递给模型类的 __init__）
+        # 确保 model_args 中包含 api_key
         if api_key:
             request.model_args["api_key"] = api_key
-            print(f"[DEBUG] 已将 api_key 添加到 model_args")
-            # 同时设置环境变量（作为备用，某些模型类可能仍需要）
             original_api_key = os.environ.get("OPENAI_API_KEY")
             os.environ["OPENAI_API_KEY"] = api_key
-            print(f"[DEBUG] 已设置环境变量 OPENAI_API_KEY")
-        else:
-            print(f"[WARNING] 未找到 api_key！")
-            print(f"[WARNING] model_id={request.model_id}")
-            print(f"[WARNING] model_args keys: {list(request.model_args.keys()) if request.model_args else None}")
-            if request.model_id:
-                try:
-                    model_data = load_model_from_file(request.model_id)
-                    print(f"[WARNING] 模型文件内容 keys: {list(model_data.keys()) if model_data else None}")
-                except Exception as e:
-                    print(f"[WARNING] 无法加载模型文件: {e}")
         
         # 准备评测参数
         eval_kwargs = {
@@ -205,8 +172,6 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             "model_args": request.model_args,
             "tasks": request.tasks,
         }
-        
-        print(f"[DEBUG] 评测参数 - model: {request.model}, base_url: {request.model_args.get('base_url')}, model_args keys: {list(request.model_args.keys()) if request.model_args else None}")
         
         if request.num_fewshot is not None:
             eval_kwargs["num_fewshot"] = request.num_fewshot
@@ -275,19 +240,69 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
         # 错误信息处理（不再使用名称映射，因为现在应该使用正确的任务名称）
         error_message = str(e)
         
-        # 检查是否是 Loglikelihood 不支持 chat completions 的错误
-        if "Loglikelihood" in error_message and ("chat completions" in error_message.lower() or "multiple_choice" in error_message.lower()):
-            error_message = (
-                "错误：当前选择的模型类型（chat completions）不支持 Loglikelihood 类型的任务。\n\n"
-                "原因：OpenAI 的 chat completions API 不提供 prompt logprobs，因此无法运行需要 loglikelihood 的任务（如 multiple_choice 类型）。\n\n"
-                "解决方案：\n"
-                "1. 使用支持 loglikelihood 的模型类型（如 'openai' 而不是 'openai-chat-completions'）\n"
-                "2. 或者选择使用 'generate_until' 输出类型的任务（如 mmlu_generative 而不是 mmlu）\n"
-                "3. 或者使用其他支持 loglikelihood 的模型（如 HuggingFace 模型）\n\n"
-                "相关链接：\n"
-                "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
-                "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
-            )
+        # 检查是否是 Loglikelihood 不支持的错误
+        # 1. chat completions 不支持 loglikelihood
+        # 2. openai-completions 只有 babbage-002 和 davinci-002 支持 loglikelihood
+        if "Loglikelihood" in error_message:
+            # 尝试从任务数据中获取实际使用的模型类型
+            try:
+                with tasks_lock:
+                    actual_model_type = tasks_db.get(task_id, {}).get("model", "unknown")
+            except:
+                actual_model_type = "unknown"
+            
+            # 检查是否是 chat completions 的错误
+            if "chat completions" in error_message.lower() or actual_model_type == "openai-chat-completions":
+                error_message = (
+                    "错误：当前选择的模型类型（openai-chat-completions）不支持 Loglikelihood 类型的任务。\n\n"
+                    "原因：OpenAI 的 chat completions API 不提供 prompt logprobs，因此无法运行需要 loglikelihood 的任务（如 multiple_choice 类型）。\n\n"
+                    "解决方案：\n"
+                    "1. 使用支持 loglikelihood 的模型类型（如 'openai-completions' 而不是 'openai-chat-completions'）\n"
+                    "2. 或者选择使用 'generate_until' 输出类型的任务（如 mmlu_generative 而不是 mmlu）\n"
+                    "3. 或者使用其他支持 loglikelihood 的模型（如 HuggingFace 模型）\n\n"
+                    "相关链接：\n"
+                    "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
+                    "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
+                )
+            # 检查是否是 openai-completions 只支持特定模型的错误
+            elif "babbage-002" in error_message or "davinci-002" in error_message or "Prompt loglikelihoods are only supported" in error_message:
+                # 检查是否是本地服务器（如 Ollama）
+                try:
+                    with tasks_lock:
+                        task_data = tasks_db.get(task_id, {})
+                        base_url = task_data.get("model_args", {}).get("base_url", "")
+                        is_local_server = base_url and ("localhost" in base_url or "127.0.0.1" in base_url or "local" in base_url.lower())
+                except:
+                    is_local_server = False
+                
+                if is_local_server:
+                    error_message = (
+                        "错误：当前使用的本地服务器（如 Ollama）不支持 Loglikelihood 类型的任务。\n\n"
+                        "原因：\n"
+                        "1. 如果使用的是 Ollama：Ollama API 不支持 logprobs 参数（参见 https://github.com/ollama/ollama/issues/2415）\n"
+                        "2. 代码限制：`openai-completions` 类型只允许 OpenAI 官方的 'babbage-002' 和 'davinci-002' 使用 loglikelihood\n\n"
+                        "解决方案：\n"
+                        "1. 使用 'generate_until' 输出类型的任务（如 mmlu_generative 而不是 mmlu）\n"
+                        "2. 如果服务器支持 logprobs（如 vLLM），但仍遇到此错误，这是代码对 OpenAI 官方 API 的限制\n"
+                        "3. 使用 HuggingFace 本地模型类型（'hf'）可以完全支持 loglikelihood\n"
+                        "4. 对于 Ollama：只能使用生成式任务，无法运行需要 loglikelihood 的选择题任务\n\n"
+                        "相关链接：\n"
+                        "- https://github.com/ollama/ollama/issues/2415（Ollama logprobs 支持问题）\n"
+                        "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
+                        "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
+                    )
+                else:
+                    error_message = (
+                        "错误：当前使用的模型不支持 Loglikelihood 类型的任务。\n\n"
+                        "原因：OpenAI 的 completions API 只支持 'babbage-002' 和 'davinci-002' 模型的 loglikelihood 功能。\n\n"
+                        "解决方案：\n"
+                        "1. 使用 'babbage-002' 或 'davinci-002' 作为模型名称\n"
+                        "2. 或者选择使用 'generate_until' 输出类型的任务（如 mmlu_generative 而不是 mmlu）\n"
+                        "3. 或者使用其他支持 loglikelihood 的模型（如 HuggingFace 模型）\n\n"
+                        "相关链接：\n"
+                        "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
+                        "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
+                    )
         # 如果错误信息只是一个任务名称（如 'mmlu'），添加更多上下文
         # 检查是否是简单的任务名称格式（带引号或不带引号）
         elif re.match(r"^['\"]?([a-zA-Z0-9_/]+)['\"]?$", error_message.strip()):
@@ -299,7 +314,7 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                 # 可能是任务名称匹配问题
                 available_tasks = set(task_manager.all_subtasks)
                 if task_name not in available_tasks:
-                    error_message = f"任务 '{task_name}' 未找到。请确认任务名称是否正确，或使用 '修复任务名称' 功能修复。"
+                    error_message = f"任务 '{task_name}' 未找到。请确认任务名称是否正确。"
                 else:
                     error_message = f"任务 '{task_name}' 执行失败。请检查任务配置、模型参数或数据集是否正确。"
         
@@ -318,14 +333,14 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
     """创建新的评测任务"""
     # 如果提供了 model_id，从本地文件加载模型并构建 model_args
     final_model_args = request.model_args
-    model_name = None  # 模型名称（用于显示）
+    model_name = None  # 模型名称（用于检查 openai-completions 的限制）
     if request.model_id:
         model_data = load_model_from_file(request.model_id)
         if not model_data:
             raise HTTPException(status_code=404, detail=f"模型不存在: {request.model_id}")
         
-        # 获取模型名称
-        model_name = model_data.get("name")
+        # 获取模型名称（用于显示）
+        model_name_display = model_data.get("name")
         
         # 使用模型数据构建 model_args
         final_model_args = get_model_args(model_data)
@@ -333,10 +348,27 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         if request.model_args:
             final_model_args.update(request.model_args)
         
-        # 确保 model 类型与模型数据一致
-        if not request.model or request.model != model_data.get("model_type"):
-            # 如果请求中的 model 类型与模型数据不一致，使用模型数据中的类型
-            request.model = model_data.get("model_type", request.model)
+        # 获取实际的模型名称（用于检查 openai-completions 的限制）
+        # 从 model_args 中的 model 字段获取（这是实际使用的模型名称）
+        model_name = final_model_args.get("model") or model_data.get("model_name") or model_name_display
+        
+        # 保存用户原始选择的模型类型
+        user_selected_model_type = request.model
+        
+        # 如果用户明确选择了与模型数据不同的类型，尊重用户的选择
+        # 这是因为同一个模型可能支持不同的 API 类型（如 openai-completions vs openai-chat-completions）
+        model_type_from_data = model_data.get("model_type")
+        if user_selected_model_type and user_selected_model_type != model_type_from_data:
+            # 用户明确选择了不同的类型，使用用户的选择
+            # request.model 保持为用户选择的值
+            pass
+        elif model_type_from_data:
+            # 用户没有明确指定或与模型数据一致，使用模型数据中的类型
+            request.model = model_type_from_data
+    else:
+        # 如果没有提供 model_id，从 model_args 中获取模型名称
+        if final_model_args:
+            model_name = final_model_args.get("model")
     
     # 验证 model_args 是否存在
     if not final_model_args:
@@ -424,6 +456,166 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         else:
             normalized_tasks = matched_tasks
     
+    # 预检查：验证任务类型与模型类型的兼容性
+    if request.model == "openai-chat-completions":
+        incompatible_tasks = []
+        
+        def check_task_output_type(task_name: str) -> list:
+            """检查任务的 output_type，返回不兼容的任务列表"""
+            incompatible = []
+            try:
+                # 获取任务的 YAML 配置
+                task_info = task_manager.task_index.get(task_name, {})
+                task_type = task_info.get("type", "")
+                yaml_path = task_info.get("yaml_path", -1)
+                
+                # 如果是组任务，需要检查组内所有子任务
+                if task_type == "group" and yaml_path != -1:
+                    from lm_eval import utils
+                    config = utils.load_yaml_config(yaml_path, mode="simple")
+                    subtask_list = config.get("task", [])
+                    
+                    # 检查组内的所有子任务
+                    for subtask in subtask_list:
+                        if isinstance(subtask, str):
+                            # 字符串格式的子任务名称
+                            subtask_incompatible = check_task_output_type(subtask)
+                            incompatible.extend(subtask_incompatible)
+                        elif isinstance(subtask, dict) and "task" in subtask:
+                            # 字典格式，包含 task 字段
+                            subtask_name = subtask["task"]
+                            subtask_incompatible = check_task_output_type(subtask_name)
+                            incompatible.extend(subtask_incompatible)
+                
+                # 如果是独立任务，检查其 output_type
+                elif yaml_path != -1:
+                    from lm_eval import utils
+                    config = utils.load_yaml_config(yaml_path, mode="simple")
+                    
+                    # 检查 output_type
+                    output_type = config.get("output_type", "generate_until")
+                    
+                    # 如果配置中有 include，也需要检查被包含的配置
+                    if "include" in config:
+                        include_path = str(Path(yaml_path).parent / config["include"])
+                        if Path(include_path).exists():
+                            include_config = utils.load_yaml_config(include_path, mode="simple")
+                            output_type = include_config.get("output_type", output_type)
+                    
+                    # 如果 output_type 是 loglikelihood 或 multiple_choice，则不兼容
+                    if output_type in ["loglikelihood", "multiple_choice", "loglikelihood_rolling"]:
+                        incompatible.append({
+                            "task": task_name,
+                            "output_type": output_type
+                        })
+            except Exception:
+                # 如果无法读取配置，跳过检查（让运行时错误处理）
+                pass
+            
+            return incompatible
+        
+        # 检查所有任务
+        for task_name in normalized_tasks:
+            task_incompatible = check_task_output_type(task_name)
+            incompatible_tasks.extend(task_incompatible)
+        
+        if incompatible_tasks:
+            # 使用实际选择的模型类型（而不是硬编码）
+            actual_model_type = request.model
+            error_msg = f"错误：当前选择的模型类型（{actual_model_type}）不支持以下任务：\n\n"
+            for item in incompatible_tasks:
+                error_msg += f"- {item['task']} (output_type: {item['output_type']})\n"
+            error_msg += "\n原因：OpenAI 的 chat completions API 不提供 prompt logprobs，因此无法运行需要 loglikelihood 的任务。\n\n"
+            error_msg += "解决方案：\n"
+            error_msg += "1. 使用支持 loglikelihood 的模型类型（如 'openai-completions' 而不是 'openai-chat-completions'）\n"
+            error_msg += "2. 或者选择使用 'generate_until' 输出类型的任务（如 mmlu_generative 而不是 mmlu）\n"
+            error_msg += "3. 或者使用其他支持 loglikelihood 的模型（如 HuggingFace 模型）\n\n"
+            error_msg += "相关链接：\n"
+            error_msg += "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
+            error_msg += "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
+            raise HTTPException(
+                status_code=400,
+                detail=error_msg
+            )
+    
+    # 检查 openai-completions 对 loglikelihood 任务的模型限制
+    if request.model == "openai-completions":
+        incompatible_tasks_openai_completions = []
+        
+        def check_task_output_type_for_openai_completions(task_name: str) -> list:
+            """检查任务的 output_type，如果是 loglikelihood 类型且模型不是 babbage-002/davinci-002，则返回不兼容"""
+            incompatible = []
+            try:
+                task_info = task_manager.task_index.get(task_name, {})
+                task_type = task_info.get("type", "")
+                yaml_path = task_info.get("yaml_path", -1)
+                
+                # 如果是组任务，需要检查组内所有子任务
+                if task_type == "group" and yaml_path != -1:
+                    from lm_eval import utils
+                    config = utils.load_yaml_config(yaml_path, mode="simple")
+                    subtask_list = config.get("task", [])
+                    
+                    for subtask in subtask_list:
+                        if isinstance(subtask, str):
+                            subtask_incompatible = check_task_output_type_for_openai_completions(subtask)
+                            incompatible.extend(subtask_incompatible)
+                        elif isinstance(subtask, dict) and "task" in subtask:
+                            subtask_name = subtask["task"]
+                            subtask_incompatible = check_task_output_type_for_openai_completions(subtask_name)
+                            incompatible.extend(subtask_incompatible)
+                
+                # 如果是独立任务，检查其 output_type
+                elif yaml_path != -1:
+                    from lm_eval import utils
+                    config = utils.load_yaml_config(yaml_path, mode="simple")
+                    
+                    output_type = config.get("output_type", "generate_until")
+                    
+                    # 如果配置中有 include，也需要检查被包含的配置
+                    if "include" in config:
+                        include_path = str(Path(yaml_path).parent / config["include"])
+                        if Path(include_path).exists():
+                            include_config = utils.load_yaml_config(include_path, mode="simple")
+                            output_type = include_config.get("output_type", output_type)
+                    
+                    # 如果 output_type 需要 loglikelihood，检查模型名称
+                    if output_type in ["loglikelihood", "multiple_choice", "loglikelihood_rolling"]:
+                        # 检查模型名称是否是 babbage-002 或 davinci-002
+                        if model_name and model_name not in ["babbage-002", "davinci-002"]:
+                            incompatible.append({
+                                "task": task_name,
+                                "output_type": output_type,
+                                "model_name": model_name
+                            })
+            except Exception:
+                pass
+            
+            return incompatible
+        
+        # 检查所有任务
+        for task_name in normalized_tasks:
+            task_incompatible = check_task_output_type_for_openai_completions(task_name)
+            incompatible_tasks_openai_completions.extend(task_incompatible)
+        
+        if incompatible_tasks_openai_completions:
+            error_msg = f"错误：当前使用的模型（{model_name or '未知'}）不支持以下需要 loglikelihood 的任务：\n\n"
+            for item in incompatible_tasks_openai_completions:
+                error_msg += f"- {item['task']} (output_type: {item['output_type']})\n"
+            error_msg += "\n原因：OpenAI 的 completions API 只支持 'babbage-002' 和 'davinci-002' 模型的 loglikelihood 功能。\n\n"
+            error_msg += "解决方案：\n"
+            error_msg += "1. 使用 'babbage-002' 或 'davinci-002' 作为模型名称\n"
+            error_msg += "2. 或者选择使用 'generate_until' 输出类型的任务（如 copa 任务的 t5-prompt 版本：super_glue-copa-t5-prompt）\n"
+            error_msg += "3. 或者使用 'hf'（HuggingFace）模型类型，可以完全支持 loglikelihood\n"
+            error_msg += "4. 或者使用 'openai-chat-completions' 类型配合 'generate_until' 任务\n\n"
+            error_msg += "相关链接：\n"
+            error_msg += "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
+            error_msg += "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
+            raise HTTPException(
+                status_code=400,
+                detail=error_msg
+            )
+    
     task_id = str(uuid.uuid4())
     
     # 使用转换后的任务名称
@@ -473,18 +665,6 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
 
 
 # 已移除 build_task_name_mapping 函数，因为现在应该直接使用正确的任务名称（从数据集对象的 task_name 字段获取）
-
-
-@router.post("/fix-task-names")
-async def fix_task_names():
-    """修复所有任务中的错误任务名称（已废弃，现在应该直接使用正确的任务名称）"""
-    # 此功能已废弃，因为现在应该直接使用正确的任务名称（从数据集对象的 task_name 字段获取）
-    # 如果任务名称错误，应该重新创建任务并选择正确的数据集
-    return {
-        "message": "此功能已废弃。请重新创建任务并选择正确的数据集，系统会自动使用正确的任务名称。",
-        "fixed_count": 0,
-        "fixed_tasks": []
-    }
 
 
 @router.post("/{task_id}/start")
@@ -574,8 +754,8 @@ async def list_tasks():
                         task["model_name"] = model_data["name"]
                         # 更新任务数据
                         save_task_to_file(task_id, task)
-                except Exception as e:
-                    print(f"[WARNING] 无法加载模型名称 {task.get('model_id')}: {e}")
+                except Exception:
+                    pass
         
         return [TaskResponse(**task) for task in tasks_db.values()]
 
@@ -602,8 +782,8 @@ async def get_task(task_id: str):
                     task["model_name"] = model_data["name"]
                     # 更新任务数据
                     save_task_to_file(task_id, task)
-            except Exception as e:
-                print(f"[WARNING] 无法加载模型名称 {task.get('model_id')}: {e}")
+            except Exception:
+                pass
         
         return TaskResponse(**task)
 

@@ -3,10 +3,6 @@
     <div class="view-header">
       <h2>数据集管理</h2>
       <div class="header-actions">
-        <el-button @click="fixTaskNames" :loading="fixingTaskNames" type="warning" style="margin-right: 10px;">
-          <el-icon><Tools /></el-icon>
-          修复任务名称
-        </el-button>
         <el-button @click="refreshCache" :loading="refreshing">
           <el-icon><Refresh /></el-icon>
           刷新缓存
@@ -286,7 +282,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search, Tools } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { datasetsApi } from '../api/datasets'
 
 const datasets = ref([])
@@ -296,7 +292,6 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const refreshing = ref(false)
-const fixingTaskNames = ref(false)
 const showAddDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentDataset = ref(null)
@@ -450,37 +445,6 @@ const refreshCache = async () => {
   }
 }
 
-const fixTaskNames = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '此操作将修复所有已保存的数据集元数据中的任务名称（从 YAML 文件重新读取 task 字段）。是否继续？',
-      '确认修复',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消'
-      }
-    )
-    
-    fixingTaskNames.value = true
-    const response = await datasetsApi.fixTaskNames()
-    
-    if (response.fixed_count > 0) {
-      ElMessage.success(`成功修复 ${response.fixed_count} 个数据集的任务名称`)
-      // 重新加载数据集列表
-      loadDatasets()
-    } else {
-      ElMessage.info('未发现需要修复的数据集')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('修复任务名称失败: ' + (error.message || '未知错误'))
-    }
-  } finally {
-    fixingTaskNames.value = false
-  }
-}
-
 const addDataset = async () => {
   adding.value = true
   try {
@@ -544,26 +508,14 @@ const loadSamples = async () => {
   loadingSamples.value = true
   samples.value = []
   try {
-    // 确保使用正确的数据集名称
-    // 优先使用 name，如果没有则使用 path
     const datasetName = currentDataset.value.name || currentDataset.value.path
-    console.log('加载样本 - 数据集信息:', {
-      name: currentDataset.value.name,
-      path: currentDataset.value.path,
-      config_name: currentDataset.value.config_name,
-      used_name: datasetName,
-      split: selectedSplit.value
-    })
-    
     const result = await datasetsApi.getDatasetSamples(
       datasetName,
       selectedSplit.value,
-      2  // 只加载2条样例
+      2
     )
-    console.log('加载样本成功:', result)
     samples.value = Array.isArray(result) ? result : []
   } catch (error) {
-    console.error('加载样本失败:', error)
     const errorMsg = error.detail || error.message || '未知错误'
     ElMessage.error('加载样本失败: ' + errorMsg)
     samples.value = []

@@ -57,6 +57,7 @@ class DatasetResponse(BaseModel):
     config_name: Optional[str] = None  # 配置名称（子文件夹名称，原始来源）
     task_name: Optional[str] = None  # 任务名称（从 YAML 的 task 字段获取，用于评测和显示）
     task: Optional[str] = None  # 任务名称（从 YAML 的 task 字段获取，用于显示）
+    output_type: Optional[str] = None  # 输出类型（generate_until, multiple_choice, loglikelihood, loglikelihood_rolling）
     source: Optional[str] = None  # 数据集来源（文件夹名称）
     description: Optional[str] = None
     local_path: Optional[str] = None
@@ -103,8 +104,8 @@ def save_dataset_metadata(dataset_path: str, config_name: Optional[str] = None, 
     try:
         with open(metadata_file, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"保存数据集元数据失败 {dataset_path}/{config_name}: {e}")
+    except Exception:
+        pass
 
 
 def load_dataset_metadata(dataset_path: str, config_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -114,8 +115,8 @@ def load_dataset_metadata(dataset_path: str, config_name: Optional[str] = None) 
         try:
             with open(metadata_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"加载数据集元数据失败 {dataset_path}/{config_name}: {e}")
+        except Exception:
+            pass
     return None
 
 
@@ -132,8 +133,8 @@ def load_all_datasets_metadata() -> Dict[str, Dict[str, Any]]:
                 config_name = metadata.get("config_name")
                 key = f"{path}:{config_name}" if config_name else path
                 metadata_dict[key] = metadata
-        except Exception as e:
-            print(f"加载数据集元数据文件失败 {metadata_file}: {e}")
+        except Exception:
+            pass
     return metadata_dict
 
 
@@ -143,8 +144,8 @@ def delete_dataset_metadata(dataset_path: str, config_name: Optional[str] = None
     if metadata_file.exists():
         try:
             metadata_file.unlink()
-        except Exception as e:
-            print(f"删除数据集元数据文件失败 {dataset_path}/{config_name}: {e}")
+        except Exception:
+            pass
 
 
 def find_task_from_yaml(dataset_path: str, config_name: Optional[str] = None) -> Optional[str]:
@@ -599,6 +600,17 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                 if task_from_yaml and existing_dataset.get("task") is None:
                                     existing_dataset["task"] = task_from_yaml
                                 
+                                # 获取并设置 output_type
+                                if existing_dataset.get("output_type") is None:
+                                    output_type = config.get("output_type", "generate_until")
+                                    # 如果配置中有 include，也需要检查被包含的配置
+                                    if "include" in config:
+                                        include_path = Path(yaml_path).parent / config["include"]
+                                        if include_path.exists():
+                                            include_config = utils.load_yaml_config(str(include_path), mode="simple")
+                                            output_type = include_config.get("output_type", output_type)
+                                    existing_dataset["output_type"] = output_type
+                                
                                 # 重要：优先使用 task 字段作为 name（如果存在），否则使用 task_name
                                 if existing_dataset.get("task"):
                                     existing_dataset["name"] = existing_dataset["task"]
@@ -673,18 +685,27 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     elif isinstance(tag_value, list):
                                         tags = tag_value
                                 
-                                # 数据集名称：使用 YAML 配置中的 task 字段
-                                # 如果没有 task 字段，则使用 task_name 作为后备
-                                dataset_display_name = task_name_from_config if task_name_from_config else task_name
+                                # 获取 output_type
+                                output_type = config.get("output_type", "generate_until")
+                                # 如果配置中有 include，也需要检查被包含的配置
+                                if "include" in config:
+                                    include_path = Path(yaml_path).parent / config["include"]
+                                    if include_path.exists():
+                                        include_config = utils.load_yaml_config(str(include_path), mode="simple")
+                                        output_type = include_config.get("output_type", output_type)
+                                
+                                # 数据集显示名称：使用 YAML 配置中的 task 字段，如果没有则使用 task_name
+                                dataset_display_name = task_from_yaml if task_from_yaml else task_name
                                 
                                 # 创建数据集对象
                                 dataset_info = {
-                                    "name": display_name,  # 临时使用文件夹名称，稍后会替换为 task 或 task_name
+                                    "name": dataset_display_name,  # 使用 task 或 task_name
                                     "path": dataset_path,  # 保持原始路径（可能包含斜杠，用于匹配）
                                     "config_name": dataset_name,
                                     "task_name": task_name,  # 从 TaskManager 获取的任务名称（用于评测）
                                     "task": task_from_yaml,  # 从 YAML 的 task 字段获取（用于显示）
-                                    "source": display_name,  # 数据集来源（文件夹名称）
+                                    "output_type": output_type,  # 输出类型
+                                    "source": dataset_path.replace("/", "_"),  # 数据集来源（文件夹名称）
                                     "description": f"Task: {task_name}",
                                     "local_path": str(local_path) if is_local else None,
                                     "is_local": is_local,
@@ -694,11 +715,7 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     "tags": tags
                                 }
                                 
-                                # 优先使用 task 字段作为 name（如果存在），否则使用 task_name
-                                if task_from_yaml:
-                                    dataset_info["name"] = task_from_yaml
-                                elif task_name:
-                                    dataset_info["name"] = task_name
+                                # 优先使用 task 字段作为 name（如果存在），否则使用 task_name（已经在上面设置）
                                 
                                 # 合并已保存的元数据（如果存在）
                                 metadata_key = f"{dataset_path}:{dataset_name}" if dataset_name else dataset_path
@@ -776,6 +793,9 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                 existing_dataset["name"] = task_name_from_config
                                 # 更新 task_name 为组名（用于评测）
                                 existing_dataset["task_name"] = group_name
+                                # 更新 output_type
+                                if existing_dataset.get("output_type") is None:
+                                    existing_dataset["output_type"] = config.get("output_type", "generate_until")
                             else:
                                 # 检查本地是否存在对应的数据集
                                 local_path = get_local_dataset_path(dataset_path.replace("/", "_"), dataset_name)
@@ -801,12 +821,16 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                                     elif isinstance(tag_value, list):
                                         tags = tag_value
                                 
+                                # 获取 output_type（组也可能有 output_type）
+                                output_type = config.get("output_type", "generate_until")
+                                
                                 # 创建数据集对象（组）
                                 dataset_info = {
                                     "name": task_name_from_config,  # 使用组名作为数据集名称
                                     "path": dataset_path,
                                     "config_name": dataset_name,
                                     "task_name": group_name,  # 组名作为任务名称（用于评测）
+                                    "output_type": output_type,  # 输出类型
                                     "description": f"Group: {group_name}",
                                     "local_path": str(local_path) if is_local else None,
                                     "is_local": is_local,
@@ -853,26 +877,6 @@ def load_all_datasets() -> List[Dict[str, Any]]:
         
         _datasets_cache = datasets
         return datasets
-
-
-@router.post("/fix-task-names")
-async def fix_task_names():
-    """修复已保存的数据集元数据中的任务名称（从 YAML 文件重新读取 task 字段）"""
-    try:
-        result = fix_dataset_task_names()
-        # 清除缓存，强制重新加载
-        global _datasets_cache
-        with _cache_lock:
-            _datasets_cache = None
-        # 重新加载数据集
-        load_all_datasets()
-        return result
-    except Exception as e:
-        return {
-            "fixed_count": 0,
-            "error_count": 1,
-            "message": f"修复失败: {str(e)}"
-        }
 
 
 @router.get("/", response_model=DatasetListResponse)
@@ -922,65 +926,6 @@ async def list_datasets(
     )
 
 
-def fix_dataset_task_names():
-    """修复已保存的数据集元数据中的任务名称（从 YAML 文件重新读取 task 字段）"""
-    fixed_count = 0
-    error_count = 0
-    
-    # 遍历所有已保存的元数据文件
-    for metadata_file in DATASETS_METADATA_DIR.rglob("*.json"):
-        try:
-            # 读取元数据
-            with open(metadata_file, "r", encoding="utf-8") as f:
-                metadata = json.load(f)
-            
-            # 获取数据集路径和配置名称
-            dataset_path = metadata.get("path", "")
-            config_name = metadata.get("config_name")
-            
-            if not dataset_path:
-                # 如果没有 path，尝试从文件名推断
-                file_name = metadata_file.stem
-                # 文件名格式可能是 path_config_name 或 path
-                if "_" in file_name:
-                    parts = file_name.rsplit("_", 1)
-                    dataset_path = parts[0]
-                    # 检查最后一部分是否是 config_name（需要验证）
-                    # 这里简化处理，直接使用文件名
-                else:
-                    dataset_path = file_name
-            
-            # 从 YAML 文件重新读取 task 字段
-            task_from_yaml = find_task_from_yaml(dataset_path, config_name)
-            
-            if task_from_yaml:
-                # 更新 task 和 name 字段
-                old_task = metadata.get("task")
-                old_name = metadata.get("name")
-                
-                metadata["task"] = task_from_yaml
-                # 优先使用 task 作为 name
-                if not metadata.get("name") or metadata.get("name") == old_name:
-                    metadata["name"] = task_from_yaml
-                
-                # 保存更新后的元数据
-                with open(metadata_file, "w", encoding="utf-8") as f:
-                    json.dump(metadata, f, ensure_ascii=False, indent=2)
-                
-                if old_task != task_from_yaml or old_name != task_from_yaml:
-                    fixed_count += 1
-                    print(f"修复数据集元数据: {dataset_path}/{config_name}, task: {old_task} -> {task_from_yaml}")
-        except Exception as e:
-            error_count += 1
-            print(f"修复数据集元数据失败 {metadata_file}: {e}")
-    
-    return {
-        "fixed_count": fixed_count,
-        "error_count": error_count,
-        "message": f"修复完成：成功修复 {fixed_count} 个数据集，{error_count} 个错误"
-    }
-
-
 @router.post("/refresh-cache")
 async def refresh_cache():
     """刷新数据集缓存"""
@@ -1013,27 +958,16 @@ async def get_dataset_samples(dataset_name: str = Query(..., description="数据
     all_datasets = load_all_datasets()
     dataset_info = None
     
-    # 调试：打印所有数据集名称
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"查找数据集: {dataset_name}")
-    logger.info(f"可用数据集名称: {[d.get('name') for d in all_datasets[:10]]}")
-    
     # 首先尝试精确匹配 name
     for d in all_datasets:
         if d.get("name") == dataset_name:
             dataset_info = d
-            logger.info(f"精确匹配成功: {dataset_name} -> {d.get('name')}")
             break
     
     # 如果找不到，尝试多种匹配方式
     if not dataset_info:
-        # 将数据集名称中的斜杠转换为下划线，用于匹配目录名格式
         dataset_name_normalized = dataset_name.replace("/", "_")
-        # 也尝试将下划线转换为斜杠
         dataset_name_with_slash = dataset_name.replace("_", "/")
-        
-        logger.info(f"尝试模糊匹配: {dataset_name} -> {dataset_name_normalized} 或 {dataset_name_with_slash}")
         
         # 尝试解析数据集名称，可能是 path/config_name 格式
         # 例如: EleutherAI/hendrycks/math_intermediate_algebra
@@ -1116,17 +1050,11 @@ async def get_dataset_samples(dataset_name: str = Query(..., description="数据
             
             if matches:
                 dataset_info = d
-                logger.info(f"模糊匹配成功: {dataset_name} -> {name} (path: {path}, config: {config_name})")
                 break
     
     if not dataset_info:
         # 提供更详细的错误信息，列出所有可用的数据集名称
-        available_names = [d.get("name", "unknown") for d in all_datasets[:20]]  # 显示前20个
-        # 也显示路径信息以便调试
-        available_info = [
-            f"{d.get('name', 'unknown')} (path: {d.get('path', 'unknown')}, config: {d.get('config_name', 'None')})"
-            for d in all_datasets[:20]
-        ]
+        available_names = [d.get("name", "unknown") for d in all_datasets[:20]]
         # 尝试查找包含相似路径的数据集
         similar_datasets = [
             d for d in all_datasets 
@@ -1144,9 +1072,6 @@ async def get_dataset_samples(dataset_name: str = Query(..., description="数据
         if similar_info:
             error_msg += f"。相似数据集: {'; '.join(similar_info)}"
         error_msg += f"。可用数据集（前10个）: {', '.join(available_names[:10])}"
-        
-        logger.error(f"数据集查找失败: {dataset_name}")
-        logger.error(f"所有可用数据集: {available_info[:10]}")
         
         raise HTTPException(
             status_code=404, 
@@ -1186,14 +1111,9 @@ async def get_dataset_samples(dataset_name: str = Query(..., description="数据
             raise ValueError(f"数据集加载失败：返回的数据不是字典格式")
             
     except Exception as e:
-        import traceback
-        error_detail = f"加载本地数据集失败: {str(e)}。路径: {local_path}"
-        # 在开发环境中，可以包含更详细的错误信息
-        if os.environ.get("DEBUG", "").lower() == "true":
-            error_detail += f"\n详细错误: {traceback.format_exc()}"
         raise HTTPException(
             status_code=500, 
-            detail=error_detail
+            detail=f"加载本地数据集失败: {str(e)}。路径: {local_path}"
         )
     
     # 检查 split 是否存在
@@ -1222,13 +1142,9 @@ async def get_dataset_samples(dataset_name: str = Query(..., description="数据
             sample_list = [dict(sample) for sample in samples]
             
     except Exception as e:
-        import traceback
-        error_detail = f"读取样本失败: {str(e)}"
-        if os.environ.get("DEBUG", "").lower() == "true":
-            error_detail += f"\n详细错误: {traceback.format_exc()}"
         raise HTTPException(
             status_code=500,
-            detail=error_detail
+            detail=f"读取样本失败: {str(e)}"
         )
     
     # 更新缓存
