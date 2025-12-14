@@ -70,6 +70,90 @@
       
       <el-divider />
       
+      <h3>评测结果详情</h3>
+      <div v-if="currentTask.results && currentTask.results.results" class="results-detail">
+        <!-- 总体结果摘要 -->
+        <el-card class="box-card" style="margin-bottom: 20px;">
+          <template #header>
+            <div class="card-header">
+              <span>总体摘要</span>
+            </div>
+          </template>
+          <el-table :data="resultsSummaryTable" style="width: 100%" border stripe>
+            <el-table-column prop="task" label="任务" width="200" show-overflow-tooltip fixed />
+            <el-table-column 
+              v-for="metric in summaryMetrics" 
+              :key="metric" 
+              :prop="metric" 
+              :label="formatMetricName(metric)"
+              width="150"
+            >
+              <template #default="{ row }">
+                {{ formatMetricValue(row[metric]) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="samples" label="样本数" width="100" />
+          </el-table>
+        </el-card>
+
+        <!-- 详细结果表格 -->
+        <el-collapse v-model="activeResultNames">
+          <el-collapse-item title="详细指标" name="1">
+            <div v-for="(taskResult, taskName) in currentTask.results.results" :key="taskName" style="margin-bottom: 15px;">
+              <h4 style="margin: 10px 0;">{{ taskName }}</h4>
+              <el-descriptions border :column="3" size="small">
+                <el-descriptions-item 
+                  v-for="(value, key) in filterMetrics(taskResult)" 
+                  :key="key" 
+                  :label="key"
+                >
+                  {{ formatMetricValue(value) }}
+                </el-descriptions-item>
+              </el-descriptions>
+            </div>
+          </el-collapse-item>
+          
+          <el-collapse-item title="配置信息" name="2">
+             <div class="config-info">
+                <pre v-if="currentTask.results.config">{{ JSON.stringify(currentTask.results.config, null, 2) }}</pre>
+                <div v-else>无配置信息</div>
+             </div>
+          </el-collapse-item>
+
+          <el-collapse-item title="样本预览 (前5条)" name="3" v-if="currentTask.results.samples_preview">
+             <div v-for="(samples, taskName) in currentTask.results.samples_preview" :key="taskName" style="margin-bottom: 20px;">
+                <h4 style="margin: 10px 0; color: #409eff;">{{ taskName }}</h4>
+                <div v-for="(sample, idx) in samples" :key="idx" class="sample-item">
+                   <div style="font-weight: bold; margin-bottom: 5px;">Sample {{ idx + 1 }}</div>
+                   <div style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; font-size: 13px;">
+                      <div style="font-weight: 500;">Input:</div>
+                      <div style="white-space: pre-wrap; background: #f9f9f9; padding: 5px;">{{ sample.doc || sample.arguments?.[0]?.[0] || '-' }}</div>
+                      
+                      <div style="font-weight: 500;">Target:</div>
+                      <div style="white-space: pre-wrap; background: #f0f9eb; padding: 5px;">{{ sample.target || sample.arguments?.[0]?.[1] || '-' }}</div>
+                      
+                      <div style="font-weight: 500;">Output:</div>
+                      <div style="white-space: pre-wrap; background: #fdf6ec; padding: 5px;">{{ sample.resps?.[0]?.[0] || sample.resps?.[0] || '-' }}</div>
+                      
+                      <div style="font-weight: 500;" v-if="sample.acc !== undefined">Accuracy:</div>
+                      <div v-if="sample.acc !== undefined">{{ sample.acc }}</div>
+                   </div>
+                </div>
+             </div>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+      <div v-else class="no-results">
+        <el-empty description="暂无详细评测结果" :image-size="100">
+           <template #description>
+              <p v-if="currentTask.status === 'completed'">结果文件可能已丢失或格式不正确</p>
+              <p v-else>任务尚未完成，请等待评测结束</p>
+           </template>
+        </el-empty>
+      </div>
+
+      <el-divider />
+      
       <h3>进度信息</h3>
       <el-alert 
         v-if="currentTask.error_message" 
@@ -90,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
@@ -102,6 +186,67 @@ const router = useRouter()
 const taskId = route.params.id
 const loading = ref(false)
 const currentTask = ref(null)
+const activeResultNames = ref(['1'])
+
+const resultsSummaryTable = computed(() => {
+  if (!currentTask.value?.results?.results) return []
+  
+  const results = currentTask.value.results.results
+  return Object.keys(results).map(taskName => {
+    const taskResult = results[taskName]
+    // 提取主要指标
+    const row = { task: taskName }
+    
+    // 自动查找并添加指标（忽略 alias 和 stderr）
+    Object.keys(taskResult).forEach(key => {
+      if (!key.endsWith(',stderr') && !key.endsWith(',none') && key !== 'alias') {
+        row[key] = taskResult[key]
+      }
+    })
+    
+    // 如果有样本数信息
+    if (currentTask.value.results.n_shot) {
+       row.samples = currentTask.value.results.n_shot[taskName] || '-'
+    } else {
+       row.samples = '-'
+    }
+    
+    return row
+  })
+})
+
+const summaryMetrics = computed(() => {
+  if (resultsSummaryTable.value.length === 0) return []
+  // 从第一行提取所有指标键（排除 task 和 samples）
+  const firstRow = resultsSummaryTable.value[0]
+  return Object.keys(firstRow).filter(key => key !== 'task' && key !== 'samples')
+})
+
+const formatMetricName = (key) => {
+  // 简单格式化指标名称
+  if (key.includes(',')) return key.split(',')[0]
+  return key
+}
+
+const formatMetricValue = (value) => {
+  if (typeof value === 'number') {
+    // 如果是小数，保留4位小数；如果是整数或百分比，适当处理
+    if (Math.abs(value) < 0.0001) return value.toExponential(2)
+    return parseFloat(value.toFixed(4))
+  }
+  return value
+}
+
+const filterMetrics = (metrics) => {
+  // 过滤掉不重要的指标展示
+  const filtered = {}
+  Object.keys(metrics).forEach(key => {
+    if (key !== 'alias') {
+       filtered[key] = metrics[key]
+    }
+  })
+  return filtered
+}
 
 const loadTaskDetail = async () => {
   if (!taskId) return
@@ -315,5 +460,30 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 50px;
+}
+
+.results-detail {
+  margin-top: 15px;
+}
+
+.config-info {
+  background: #f5f7fa;
+  padding: 15px;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.sample-item {
+  background: white;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.no-results {
+  padding: 20px 0;
 }
 </style>

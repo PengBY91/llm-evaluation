@@ -115,6 +115,7 @@ class TaskResponse(BaseModel):
     progress: Optional[Dict[str, Any]] = None
     result_file: Optional[str] = None
     error_message: Optional[str] = None
+    results: Optional[Dict[str, Any]] = None  # 完整的评测结果（仅在 completed 状态且请求详情时返回）
 
 
 def run_evaluation(task_id: str, request: TaskCreateRequest):
@@ -614,7 +615,29 @@ async def get_task(task_id: str):
             except Exception as e:
                 print(f"[WARNING] 无法加载模型名称 {task.get('model_id')}: {e}")
         
-        return TaskResponse(**task)
+        # 构建响应数据
+        response_data = task.copy()
+        
+        # 如果任务已完成，尝试加载完整结果（但不包括原始样本，以免过大）
+        if task["status"] == "completed" and task.get("result_file") and os.path.exists(task["result_file"]):
+            try:
+                with open(task["result_file"], "r", encoding="utf-8") as f:
+                    full_results = json.load(f)
+                    # 仅保留关键信息，移除可能很大的字段（如 samples）
+                    # 但保留 results, config, versions, n-shot, git_hash 等
+                    if "samples" in full_results:
+                         # 采样少量样本用于展示（例如每个任务前5个）
+                         samples_preview = {}
+                         for task_name, samples in full_results["samples"].items():
+                             samples_preview[task_name] = samples[:5] if isinstance(samples, list) else samples
+                         full_results["samples_preview"] = samples_preview
+                         del full_results["samples"] # 移除完整样本
+                    
+                    response_data["results"] = full_results
+            except Exception as e:
+                print(f"加载结果文件失败: {e}")
+        
+        return TaskResponse(**response_data)
 
 
 @router.delete("/{task_id}")
