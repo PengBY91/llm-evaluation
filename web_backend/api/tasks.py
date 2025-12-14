@@ -204,6 +204,23 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             "model_args": request.model_args,
             "tasks": request.tasks,
         }
+
+        # 针对 API 模型自动优化并发参数
+        if request.model in ["openai-chat-completions", "openai-completions"]:
+            # 如果没有显式设置 num_concurrent，则设置默认值以提高并发性能
+            # 默认值设为 20，这对于大多数 API 提供商（OpenAI, DeepSeek, vLLM 等）都是安全的起始值
+            if "num_concurrent" not in request.model_args:
+                # 检查是否在 request 顶层设置了 (虽然目前 API 定义里没有这个字段，但为了健壮性)
+                # 注意：TaskCreateRequest 定义里没有 max_concurrent/num_concurrent，只有 model_args 里有
+                default_concurrent = 20
+                request.model_args["num_concurrent"] = default_concurrent
+                print(f"[INFO] 自动优化: 为 API 模型设置 num_concurrent={default_concurrent}")
+
+            # 确保 batch_size 设置合理
+            # 对于 API 模型，batch_size='auto' 可能导致尝试探测最大 batch size，这对于 API 来说通常没有意义且耗时
+            # 如果用户没有指定 batch_size，我们显式设置为 1 (或者是 'auto'，取决于 lm_eval 版本对 API 模型的处理)
+            # lm-eval 对 API 模型的 batch_size 处理：通常建议设为 1 或 'auto'
+            # 如果未设置，保持默认（通常是 1）
         
         print(f"[DEBUG] 评测参数 - model: {request.model}, base_url: {request.model_args.get('base_url')}, model_args keys: {list(request.model_args.keys()) if request.model_args else None}")
         

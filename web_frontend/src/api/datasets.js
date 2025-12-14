@@ -28,6 +28,11 @@ export const datasetsApi = {
     })
   },
   
+  // 获取数据集 README
+  getDatasetReadme(datasetId) {
+    return api.get(`/datasets/${datasetId}/readme`)
+  },
+  
   // 刷新缓存
   refreshCache() {
     return api.post('/datasets/refresh-cache')

@@ -143,122 +143,17 @@
         <el-button type="primary" @click="addDataset" :loading="adding">添加</el-button>
       </template>
     </el-dialog>
-
-    <!-- 数据集详情对话框 -->
-    <el-dialog 
-      v-model="showDetailDialog" 
-      title="数据集详情" 
-      width="900px"
-      :close-on-click-modal="false"
-    >
-      <div v-if="currentDataset">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="数据集名称">{{ currentDataset.name }}</el-descriptions-item>
-          <el-descriptions-item label="路径">{{ currentDataset.path }}</el-descriptions-item>
-          <el-descriptions-item label="配置名称">
-            {{ currentDataset.config_name || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="类别">
-            <el-tag v-if="currentDataset.category" size="small">{{ currentDataset.category }}</el-tag>
-            <span v-else>-</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="本地状态">
-            <el-tag :type="currentDataset.is_local ? 'success' : 'info'">
-              {{ currentDataset.is_local ? '已下载' : '未下载' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="本地路径">
-            {{ currentDataset.local_path || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="描述" :span="2">
-            {{ currentDataset.description || '-' }}
-          </el-descriptions-item>
-        </el-descriptions>
-        
-        <el-divider />
-        
-        <h3>Splits</h3>
-        <el-tag v-for="split in currentDataset.splits" :key="split" style="margin-right: 5px;">
-          {{ split }}
-        </el-tag>
-        
-        <el-divider v-if="currentDataset.num_examples" />
-        
-        <h3 v-if="currentDataset.num_examples">样本数量</h3>
-        <el-table v-if="currentDataset.num_examples" :data="numExamplesTable" border>
-          <el-table-column prop="split" label="Split" />
-          <el-table-column prop="count" label="数量" />
-        </el-table>
-        
-        <el-divider v-if="currentDataset.splits && currentDataset.splits.length > 0" />
-        
-        <div v-if="currentDataset && currentDataset.splits && currentDataset.splits.length > 0">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="margin: 0;">样本预览</h3>
-            <el-button 
-              v-if="showSamplesPreview === false"
-              type="primary" 
-              size="small"
-              @click="handleShowSamplesPreview"
-            >
-              查看样本
-            </el-button>
-          </div>
-          
-          <div v-if="showSamplesPreview === true">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <el-select v-model="selectedSplit" @change="loadSamples" style="width: 200px;">
-                <el-option 
-                  v-for="split in currentDataset.splits" 
-                  :key="split" 
-                  :label="split" 
-                  :value="split" 
-                />
-              </el-select>
-              <el-radio-group v-model="sampleDisplayFormat" size="small">
-                <el-radio-button label="json">JSON</el-radio-button>
-                <el-radio-button label="markdown">Markdown</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div v-if="loadingSamples" style="text-align: center; padding: 20px;">
-              加载中...
-            </div>
-            <div v-else-if="samples.length === 0" style="text-align: center; padding: 20px; color: #999;">
-              暂无样本数据
-            </div>
-            <div v-else>
-              <div 
-                v-for="(sample, index) in samples" 
-                :key="index" 
-                style="margin-bottom: 20px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 15px; background: #f5f7fa;"
-              >
-                <div style="font-weight: bold; margin-bottom: 10px; color: #409eff;">
-                  样本 {{ index + 1 }}
-                </div>
-                <pre 
-                  v-if="sampleDisplayFormat === 'json'"
-                  style="margin: 0; padding: 10px; background: white; border-radius: 4px; overflow-x: auto; font-size: 13px; line-height: 1.5;"
-                >{{ formatSampleAsJson(sample) }}</pre>
-                <div 
-                  v-else
-                  style="padding: 10px; background: white; border-radius: 4px; overflow-x: auto; font-size: 13px; line-height: 1.5;"
-                  v-html="formatSampleAsMarkdown(sample)"
-                ></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { datasetsApi } from '../api/datasets'
 
+const router = useRouter()
 const datasets = ref([])
 const categories = ref([])
 const total = ref(0)
@@ -267,13 +162,6 @@ const pageSize = ref(20)
 const loading = ref(false)
 const refreshing = ref(false)
 const showAddDialog = ref(false)
-const showDetailDialog = ref(false)
-const currentDataset = ref(null)
-const selectedSplit = ref('train')
-const samples = ref([])
-const loadingSamples = ref(false)
-const showSamplesPreview = ref(false)
-const sampleDisplayFormat = ref('json')
 const adding = ref(false)
 const searchKeyword = ref('')
 const selectedCategory = ref('')
@@ -286,70 +174,10 @@ const datasetForm = ref({
   save_local: true
 })
 
-const numExamplesTable = computed(() => {
-  if (!currentDataset.value?.num_examples) return []
-  return Object.entries(currentDataset.value.num_examples).map(([split, count]) => ({
-    split,
-    count: count.toLocaleString()
-  }))
-})
+// 移除不需要的响应式变量和函数
+// const showDetailDialog, currentDataset, selectedSplit, samples, loadingSamples, showSamplesPreview, sampleDisplayFormat, numExamplesTable, sampleKeys
+// formatSampleAsJson, formatSampleAsMarkdown, formatMarkdown, escapeHtml, loadReadme, handleShowSamplesPreview, loadSamples
 
-const sampleKeys = computed(() => {
-  if (samples.value.length === 0) return []
-  return Object.keys(samples.value[0])
-})
-
-// 将样本格式化为 JSON 字符串
-const formatSampleAsJson = (sample) => {
-  try {
-    return JSON.stringify(sample, null, 2)
-  } catch (error) {
-    return String(sample)
-  }
-}
-
-// 将样本格式化为 Markdown 格式
-const formatSampleAsMarkdown = (sample) => {
-  let markdown = ''
-  for (const [key, value] of Object.entries(sample)) {
-    markdown += `### ${key}\n\n`
-    if (value === null || value === undefined) {
-      markdown += `*null*\n\n`
-    } else if (typeof value === 'object') {
-      markdown += `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n\n`
-    } else if (typeof value === 'string' && (value.includes('\n') || value.length > 100)) {
-      markdown += `\`\`\`\n${value}\n\`\`\`\n\n`
-    } else {
-      markdown += `${value}\n\n`
-    }
-  }
-  // 简单的 Markdown 转 HTML（只处理基本格式）
-  let html = markdown
-    // 处理代码块（JSON）
-    .replace(/```json\n([\s\S]*?)```/g, (match, code) => {
-      return `<pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; margin: 8px 0; border-left: 3px solid #409eff;"><code style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px;">${escapeHtml(code.trim())}</code></pre>`
-    })
-    // 处理代码块（普通文本）
-    .replace(/```\n([\s\S]*?)```/g, (match, code) => {
-      return `<pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; margin: 8px 0; border-left: 3px solid #67c23a;"><code style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px;">${escapeHtml(code.trim())}</code></pre>`
-    })
-    // 处理标题
-    .replace(/### (.*?)\n\n/g, '<h4 style="margin: 16px 0 8px 0; color: #409eff; font-size: 16px; font-weight: 600;">$1</h4>')
-    // 处理斜体
-    .replace(/\*(.*?)\*/g, '<em style="color: #909399;">$1</em>')
-    // 处理换行
-    .replace(/\n\n/g, '</p><p style="margin: 8px 0;">')
-    .replace(/\n/g, '<br>')
-  
-  return `<p style="margin: 8px 0;">${html}</p>`
-}
-
-// HTML 转义
-const escapeHtml = (text) => {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
 
 const loadDatasets = async () => {
   loading.value = true
@@ -439,76 +267,17 @@ const addDataset = async () => {
   }
 }
 
-const viewDataset = async (dataset) => {
-  try {
-    // 重置样本预览状态
-    showSamplesPreview.value = false
-    samples.value = []
-    selectedSplit.value = 'train'
-    
-    // 如果数据集已经有完整信息，直接使用
-    if (dataset.splits && dataset.local_path) {
-      currentDataset.value = dataset
-      if (dataset.splits && dataset.splits.length > 0) {
-        selectedSplit.value = dataset.splits[0]
-      }
-      showDetailDialog.value = true
-    } else {
-      // 否则从 API 获取详情
-      currentDataset.value = await datasetsApi.getDataset(dataset.name)
-      if (currentDataset.value.splits && currentDataset.value.splits.length > 0) {
-        selectedSplit.value = currentDataset.value.splits[0]
-      }
-      showDetailDialog.value = true
-    }
-  } catch (error) {
-    ElMessage.error('获取数据集详情失败: ' + error.message)
-  }
+const viewDataset = (dataset) => {
+  // 在新标签页打开详情页
+  const routeUrl = router.resolve({
+    name: 'DatasetDetail',
+    params: { id: dataset.id }
+  })
+  window.open(routeUrl.href, '_blank')
 }
 
-const handleShowSamplesPreview = async () => {
-  showSamplesPreview.value = true
-  // 显示预览时自动加载样本
-  if (currentDataset.value && selectedSplit.value) {
-    await loadSamples()
-  }
-}
-
-const loadSamples = async () => {
-  if (!currentDataset.value || !selectedSplit.value) {
-    samples.value = []
-    return
-  }
-  loadingSamples.value = true
-  samples.value = []
-  try {
-    // 确保使用正确的数据集名称
-    // 优先使用 name，如果没有则使用 path
-    const datasetName = currentDataset.value.name || currentDataset.value.path
-    console.log('加载样本 - 数据集信息:', {
-      name: currentDataset.value.name,
-      path: currentDataset.value.path,
-      config_name: currentDataset.value.config_name,
-      used_name: datasetName,
-      split: selectedSplit.value
-    })
-    
-    const result = await datasetsApi.getDatasetSamples(
-      datasetName,
-      selectedSplit.value,
-      2  // 只加载2条样例
-    )
-    console.log('加载样本成功:', result)
-    samples.value = Array.isArray(result) ? result : []
-  } catch (error) {
-    console.error('加载样本失败:', error)
-    const errorMsg = error.detail || error.message || '未知错误'
-    ElMessage.error('加载样本失败: ' + errorMsg)
-    samples.value = []
-  } finally {
-    loadingSamples.value = false
-  }
-}
+// 移除不需要的函数
+// const loadReadme, handleShowSamplesPreview, loadSamples
 
 const deleteDataset = async (datasetName) => {
   try {

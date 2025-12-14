@@ -229,72 +229,25 @@
         <el-button type="primary" @click="createTask">创建</el-button>
       </template>
     </el-dialog>
-
-    <!-- 任务详情对话框 -->
-    <el-dialog v-model="showDetailDialog" title="任务详情" width="900px">
-      <div v-if="currentTask">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="任务ID">{{ currentTask.id }}</el-descriptions-item>
-          <el-descriptions-item label="任务名称">{{ currentTask.name }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="getStatusType(currentTask.status)">
-              {{ getStatusText(currentTask.status) }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="模型">
-            {{ currentTask.model_name || currentTask.model }}
-          </el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatTime(currentTask.created_at) }}</el-descriptions-item>
-          <el-descriptions-item label="更新时间">{{ formatTime(currentTask.updated_at) }}</el-descriptions-item>
-        </el-descriptions>
-        
-        <el-divider />
-        
-        <h3>评测任务</h3>
-        <div v-if="currentTask.datasets && currentTask.datasets.length > 0">
-           <el-tag v-for="ds in currentTask.datasets" :key="ds.id" style="margin-right: 5px; margin-bottom: 5px;">
-              {{ getDatasetLabel(ds) }}
-           </el-tag>
-        </div>
-        <div v-else>
-          <el-tag v-for="task in currentTask.tasks" :key="task" style="margin-right: 5px;">
-            {{ task }}
-          </el-tag>
-        </div>
-        
-        <el-divider />
-        
-        <h3>进度信息</h3>
-        <el-alert 
-          v-if="currentTask.error_message" 
-          :title="formatErrorMessage(currentTask.error_message)" 
-          type="error" 
-          style="margin-bottom: 10px"
-        />
-        <div v-if="currentTask.progress">
-          <pre>{{ JSON.stringify(currentTask.progress, null, 2) }}</pre>
-        </div>
-        <div v-else>暂无进度信息</div>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { tasksApi } from '../api/tasks'
 import { modelsApi } from '../api/models'
 import { datasetsApi } from '../api/datasets'
 
+const router = useRouter()
 const tasks = ref([])
 const models = ref([])
 const availableTasks = ref([])  // 存储完整的数据集信息对象
 const availableDatasets = ref([])  // 存储所有数据集信息，用于查找
 const loading = ref(false)
 const showCreateDialog = ref(false)
-const showDetailDialog = ref(false)
 const currentTask = ref(null)
 const modelArgsStr = ref('{}')
 const loadingAvailableTasks = ref(false)
@@ -356,11 +309,15 @@ const isDatasetCompatible = (dataset) => {
   // 如果没有选择模型类型，默认都兼容
   if (!taskForm.value.model) return true
   
-  const isChatModel = taskForm.value.model.includes('chat')
+  // 检查模型类型是否为 chat completions
+  const isChatInterface = taskForm.value.model === 'openai-chat-completions'
+  
   const taskName = (dataset.task_name || dataset.name).toLowerCase()
   const outputType = dataset.output_type ? dataset.output_type.toLowerCase() : null
   
-  if (isChatModel) {
+  // 只有在使用 Chat Completions 接口（不支持 logprobs）时才进行严格检查
+  // 如果使用的是 Completions 接口（默认），则支持所有任务
+  if (isChatInterface) {
     // 1. 如果 output_type 明确为 loglikelihood，则不兼容
     // 除非它是 generative 任务（虽然通常 generative 对应 generate_until）
     if (outputType === 'loglikelihood' || outputType === 'loglikelihood_rolling') {
@@ -368,6 +325,12 @@ const isDatasetCompatible = (dataset) => {
        if (taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')) {
            return true
        }
+       // 既然我们现在主要用 Completions 接口，其实是支持 loglikelihood 的。
+       // 但是这里 isChatModel 判断的是 model.includes('chat')，
+       // 而我们的默认模型类型虽然叫 openai-completions，但如果用户在创建时选择了 chat...
+       // 等等，我们已经在 ModelsView 强制把类型改成了 openai-completions。
+       // 只要用户使用的是 Completions 接口，就支持 logprobs。
+       // 只有当用户显式选择 Chat Completions 接口（不支持 logprobs）时才需要警告。
        return false
     }
     
@@ -401,11 +364,13 @@ const isDatasetCompatible = (dataset) => {
 const getDatasetCompatibilityInfo = (dataset) => {
   if (!taskForm.value.model) return { compatible: true }
   
-  const isChatModel = taskForm.value.model.includes('chat')
+  // 检查模型类型是否为 chat completions
+  const isChatInterface = taskForm.value.model === 'openai-chat-completions'
+
   const taskName = (dataset.task_name || dataset.name).toLowerCase()
   const outputType = dataset.output_type ? dataset.output_type.toLowerCase() : null
   
-  if (isChatModel) {
+  if (isChatInterface) {
     let reason = '此任务通常需要 logprobs，OpenAI Chat 模型不支持。建议使用 Completions 模型或选择该任务的 CoT/Generative 版本。'
     
     if (outputType === 'loglikelihood' || outputType === 'loglikelihood_rolling' || outputType === 'multiple_choice') {
@@ -574,13 +539,13 @@ const createTask = async () => {
   }
 }
 
-const viewTask = async (taskId) => {
-  try {
-    currentTask.value = await tasksApi.getTask(taskId)
-    showDetailDialog.value = true
-  } catch (error) {
-    ElMessage.error('获取任务详情失败: ' + error.message)
-  }
+const viewTask = (taskId) => {
+  // 在新标签页打开详情页
+  const routeUrl = router.resolve({
+    name: 'TaskDetail',
+    params: { id: taskId }
+  })
+  window.open(routeUrl.href, '_blank')
 }
 
 const deleteTask = async (taskId) => {

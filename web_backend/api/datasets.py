@@ -711,6 +711,69 @@ async def get_dataset(dataset_id: str):
     raise HTTPException(status_code=404, detail="数据集不存在")
 
 
+@router.get("/{dataset_id}/readme")
+async def get_dataset_readme(dataset_id: str):
+    """获取数据集 README 内容"""
+    all_datasets = load_all_datasets()
+    dataset_info = None
+    
+    # 1. 优先匹配 ID
+    for ds in all_datasets:
+        if ds.get("id") == dataset_id:
+            dataset_info = ds
+            break
+            
+    # 2. 兼容匹配 name
+    if not dataset_info:
+        for ds in all_datasets:
+            if ds.get("name") == dataset_id:
+                dataset_info = ds
+                break
+    
+    if not dataset_info:
+        raise HTTPException(status_code=404, detail="数据集不存在")
+    
+    # 获取任务名称（或文件夹名）
+    task_name = dataset_info.get("task_name") or dataset_info.get("name")
+    if not task_name:
+        return {"content": None}
+
+    # 尝试在 lm_eval/tasks 目录下查找对应的 README.md
+    # 路径通常是 lm_eval/tasks/{task_name}/README.md
+    # 或者 lm_eval/tasks/{group_name}/{subtask_name}/README.md (复杂情况暂不处理，先处理顶层)
+    
+    lm_eval_tasks_dir = Path(__file__).parent.parent.parent / "lm_eval" / "tasks"
+    
+    # 尝试直接匹配任务名目录
+    readme_path = lm_eval_tasks_dir / task_name / "README.md"
+    
+    # 如果找不到，尝试处理包含子配置的情况 (e.g. bbh/boolean_expressions -> bbh)
+    if not readme_path.exists():
+        # 如果 task_name 包含下划线或斜杠，尝试取第一部分
+        # e.g. mmlu_abstract_algebra -> mmlu
+        # e.g. bbh/boolean_expressions -> bbh
+        
+        parts = task_name.replace("/", "_").split("_")
+        if len(parts) > 1:
+            # 尝试逐级查找
+            # 比如对于 mmlu_abstract_algebra，先找 mmlu
+            potential_group = parts[0]
+            group_readme = lm_eval_tasks_dir / potential_group / "README.md"
+            if group_readme.exists():
+                readme_path = group_readme
+
+    if readme_path.exists():
+        try:
+            with open(readme_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return {"content": content}
+        except Exception as e:
+            print(f"读取 README 失败: {e}")
+            return {"content": None}
+    
+    return {"content": None}
+
+
 @router.post("/", response_model=DatasetResponse)
 async def add_dataset(request: DatasetAddRequest):
     """添加/下载数据集"""

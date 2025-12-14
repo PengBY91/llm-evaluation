@@ -212,12 +212,50 @@ class TemplateAPI(TemplateLM):
                         import tiktoken
 
                         self.tokenizer = tiktoken.encoding_for_model(self.model)
-                    except ModuleNotFoundError as e:
-                        raise ModuleNotFoundError(
-                            "Attempted to use 'openai' LM type, but the package `tiktoken` is not installed. "
-                            "Please install it via `pip install lm-eval[api]` or `pip install -e .[api]`."
-                        ) from e
-                    if "openai" not in self.base_url:
+                    except (ModuleNotFoundError, KeyError, ValueError) as e:
+                        # 检查是否是 qwen3 模型
+                        if self.model and self.model.lower().startswith("qwen3"):
+                            # qwen3 模型使用指定的 tokenizer
+                            import transformers
+                            from pathlib import Path
+                            
+                            # 获取项目根目录（假设 api_models.py 在 lm_eval/models/ 目录下）
+                            project_root = Path(__file__).parent.parent.parent
+                            tokenizer_path = project_root / "models" / "tokenizer" / "Qwen" / "Qwen3-8B"
+                            
+                            if tokenizer_path.exists():
+                                eval_logger.info(
+                                    f"qwen3 model detected: {self.model}. "
+                                    f"Switching to HuggingFace tokenizer at {tokenizer_path}"
+                                )
+                                self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+                                    str(tokenizer_path),
+                                    trust_remote_code=trust_remote_code,
+                                    revision=revision,
+                                    use_fast=use_fast_tokenizer,
+                                )
+                                # 更新 tokenizer_backend 为 huggingface，因为我们已经切换了
+                                self.tokenizer_backend = "huggingface"
+                                # Not used as the API will handle padding but to mirror the behavior of the HFLM
+                                from lm_eval.models.utils import configure_pad_token
+                                self.tokenizer = configure_pad_token(self.tokenizer)
+                            else:
+                                raise ValueError(
+                                    f"Could not automatically map {self.model} to a tokeniser. "
+                                    f"Expected tokenizer path {tokenizer_path} does not exist. "
+                                    f"Please use `tiktoken.get_encoding` to explicitly get the tokeniser you expect."
+                                ) from e
+                        elif isinstance(e, ModuleNotFoundError):
+                            raise ModuleNotFoundError(
+                                "Attempted to use 'openai' LM type, but the package `tiktoken` is not installed. "
+                                "Please install it via `pip install lm-eval[api]` or `pip install -e .[api]`."
+                            ) from e
+                        else:
+                            raise ValueError(
+                                f"Could not automatically map {self.model} to a tokeniser. "
+                                "Please use `tiktoken.get_encoding` to explicitly get the tokeniser you expect."
+                            ) from e
+                    if "openai" not in self.base_url and self.tokenizer_backend == "tiktoken":
                         eval_logger.warning(
                             f"Passed `base_url={self.base_url}` but using (OpenAI) Tiktoken tokenizer backend. "
                             "Pass `tokenizer_backend=huggingface` and provide the HF tokenizer name if your model does not use Tiktoken."
