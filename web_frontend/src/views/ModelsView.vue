@@ -48,7 +48,7 @@
         <el-form-item label="模型名称" prop="name" required>
           <el-input v-model="modelForm.name" placeholder="请输入模型名称" />
         </el-form-item>
-        <el-form-item label="模型类型" prop="model_type" required>
+        <el-form-item label="模型类型" prop="model_type" required v-show="false">
           <el-select 
             v-model="modelForm.model_type" 
             placeholder="请选择模型类型"
@@ -73,7 +73,7 @@
           <div style="display: flex; gap: 10px;">
             <el-input 
               v-model="apiUrl" 
-              placeholder="例如: http://localhost:11434/v1"
+              placeholder="例如: http://localhost:8000/v1/completions"
             />
             <el-button 
               @click="testConnection" 
@@ -83,6 +83,7 @@
               测试
             </el-button>
           </div>
+          <div class="form-tip">支持 logprobs 的 OpenAI Completion 格式接口，例如: https://{ip}:{port}/v1/completions</div>
           <el-alert
             v-if="testResult"
             :title="testResult.message"
@@ -281,7 +282,7 @@ const cancelEdit = () => {
 const resetForm = () => {
   modelForm.value = {
     name: '',
-    model_type: '',
+    model_type: 'openai-completions', // 默认设置为 openai-completions
     description: '',
     base_url: '',
     api_key: '',
@@ -297,6 +298,8 @@ const resetForm = () => {
   if (modelFormRef.value) {
     modelFormRef.value.resetFields()
   }
+  // 确保重置后 model_type 仍然是 openai-completions
+  modelForm.value.model_type = 'openai-completions'
 }
 
 const saveModel = async () => {

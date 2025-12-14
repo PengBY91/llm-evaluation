@@ -203,239 +203,87 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
     datasets = []
     
     # 1. 扫描本地 data 目录，建立数据映射表
-    # local_data_map: {(path, config) -> local_path}
+    # 只扫描第一层目录
     local_data_map = {}
     
     if DATA_DIR.exists():
-        for root, dirs, files in os.walk(DATA_DIR):
-            root_path = Path(root)
-            
-            # 跳过 DATA_DIR 本身和特殊目录
-            if root_path == DATA_DIR or any(part.startswith('.') for part in root_path.parts) or \
-               'datasets_metadata' in root_path.parts or 'tasks' in root_path.parts:
+        # 获取所有第一层子目录
+        top_level_dirs = [d for d in DATA_DIR.iterdir() if d.is_dir()]
+        
+        for dir_path in top_level_dirs:
+            # 跳过特殊目录
+            if dir_path.name.startswith('.') or dir_path.name in ['datasets_metadata', 'tasks']:
                 continue
-            
-            # 检查是否是有效数据集
-            has_dataset_dict = 'dataset_dict.json' in files
-            has_dataset_info = 'dataset_info.json' in files
-            has_arrow = any(f.endswith('.arrow') for f in files)
-            
-            is_potential_dataset = has_dataset_dict or has_dataset_info or has_arrow
-
-            if is_potential_dataset:
-                try:
-                    rel_path = root_path.relative_to(DATA_DIR)
-                    parts = rel_path.parts
-                    
-                    dataset_path = None
-                    config_name = None
-                    
-                    # 尝试解析路径
-                    if len(parts) == 1:
-                        dataset_path = parts[0]
-                    elif len(parts) >= 2:
-                        dataset_path = "/".join(parts[:-1])
-                        config_name = parts[-1]
-                    
-                    # 存储映射
-                    if dataset_path:
-                         # 原始路径
-                         local_data_map[(dataset_path, config_name)] = str(root_path)
-                         # 简化路径（处理 cais/mmlu vs mmlu）
-                         if "/" in dataset_path:
-                             simple_path = dataset_path.split("/")[-1]
-                             local_data_map[(simple_path, config_name)] = str(root_path)
-                             
-                except Exception:
-                    pass
-
-            # 如果当前目录被识别为数据集（无论是否成功解析路径），则不再遍历其子目录
-            # 这可以防止将数据集的子文件夹（如 splits, checkpoints）误识别为独立数据集
-            if is_potential_dataset:
-                dirs[:] = []
-
-    # 2. 从 TaskManager 获取所有任务，并匹配本地数据
-    try:
-        from lm_eval.tasks import TaskManager
-        from lm_eval import utils
-        task_manager = TaskManager()
-        
-        # 记录已处理的本地路径，用于最后找出未匹配的数据集
-        processed_local_paths = set()
-        
-        # 遍历所有子任务
-        for task_name in task_manager.all_subtasks:
-            task_info = task_manager.task_index.get(task_name, {})
-            yaml_path = task_info.get("yaml_path", -1)
-            
-            if yaml_path != -1:
-                try:
-                    config = utils.load_yaml_config(yaml_path, mode="simple")
-                    ds_path = config.get("dataset_path")
-                    ds_name = config.get("dataset_name")
-                    output_type = config.get("output_type")
-                    
-                    # 查找匹配的本地数据
-                    matched_local_path = None
-                    
-                    # 尝试匹配
-                    # A. 精确匹配
-                    if (ds_path, ds_name) in local_data_map:
-                        matched_local_path = local_data_map[(ds_path, ds_name)]
-                    # B. 简化路径匹配 (cais/mmlu -> mmlu)
-                    elif ds_path and "/" in ds_path and (ds_path.split("/")[-1], ds_name) in local_data_map:
-                         matched_local_path = local_data_map[(ds_path.split("/")[-1], ds_name)]
-                    # C. None config 匹配 (dataset_name is None -> config is None or 'default'?)
-                    elif ds_name is None:
-                         if (ds_path, None) in local_data_map:
-                             matched_local_path = local_data_map[(ds_path, None)]
-                         elif ds_path and "/" in ds_path and (ds_path.split("/")[-1], None) in local_data_map:
-                             matched_local_path = local_data_map[(ds_path.split("/")[-1], None)]
-                    
-                    if matched_local_path:
-                        processed_local_paths.add(matched_local_path)
-                        
-                        # 加载数据集统计信息
-                        splits = None
-                        num_examples = None
-                        try:
-                            ds_obj = load_from_disk(matched_local_path)
-                            splits = list(ds_obj.keys())
-                            num_examples = {split: len(ds_obj[split]) for split in splits}
-                        except Exception:
-                            pass
-                            
-                        # 获取标签
-                        tags = []
-                        if "tag" in config:
-                            tag_value = config["tag"]
-                            if isinstance(tag_value, str):
-                                tags = [tag_value]
-                            elif isinstance(tag_value, list):
-                                tags = tag_value
-
-                        # 格式化显示名称
-                        display_name = task_name
-                        if ds_name and ds_name not in ["default", "main"]:
-                             # 如果任务名已经包含了配置名（如 mmlu_abstract_algebra），尝试让显示更友好
-                             if task_name.endswith(f"_{ds_name}"):
-                                 base = task_name[:-len(ds_name)-1]
-                                 display_name = f"{base} ({ds_name})"
-                             elif ds_name not in task_name:
-                                 display_name = f"{task_name} ({ds_name})"
-
-                        dataset_info = {
-                            "id": task_name,  # 使用 task_name 作为 ID，确保唯一性且与评测一致
-                            "name": display_name, # 显示名称
-                            "path": ds_path or task_name,
-                            "config_name": ds_name,
-                            "task_name": task_name,
-                            "description": f"Task: {task_name}",
-                            "local_path": matched_local_path,
-                            "is_local": True,
-                            "splits": splits,
-                            "num_examples": num_examples,
-                            "category": infer_category(ds_path or task_name, task_name, tags),
-                            "tags": tags,
-                            "output_type": output_type
-                        }
-                        
-                        # 合并已保存的元数据
-                        metadata_key = task_name # 使用 task_name 作为 key 更可靠
-                        if metadata_key in saved_metadata:
-                             saved_meta = saved_metadata[metadata_key]
-                             if "description" in saved_meta: dataset_info["description"] = saved_meta["description"]
-                             if "category" in saved_meta: dataset_info["category"] = saved_meta["category"]
-                             if "tags" in saved_meta: dataset_info["tags"] = saved_meta["tags"]
-                        
-                        # 兼容旧 key
-                        old_key = f"{ds_path}:{ds_name}" if ds_name else ds_path
-                        if old_key in saved_metadata:
-                             saved_meta = saved_metadata[old_key]
-                             if "description" in saved_meta: dataset_info["description"] = saved_meta["description"]
-                             if "category" in saved_meta: dataset_info["category"] = saved_meta["category"]
-                             if "tags" in saved_meta: dataset_info["tags"] = saved_meta["tags"]
-
-                        datasets.append(dataset_info)
-                except Exception:
-                    pass
-
-        # 3. 处理任务组 (Groups)
-        # 如果一个组对应的文件夹存在，我们也应该允许运行整个组
-        for group_name in task_manager.all_groups:
-             # 检查是否有对应的本地数据 (group_name, None)
-             matched_local_path = None
-             if (group_name, None) in local_data_map:
-                 matched_local_path = local_data_map[(group_name, None)]
-             
-             if matched_local_path and group_name not in [d["id"] for d in datasets]:
-                 processed_local_paths.add(matched_local_path)
-                 # ... 创建 Group 的 dataset_info
-                 try:
-                    ds_obj = load_from_disk(matched_local_path)
-                    splits = list(ds_obj.keys())
-                    num_examples = {split: len(ds_obj[split]) for split in splits}
-                 except Exception:
-                    splits, num_examples = None, None
-
-                 dataset_info = {
-                    "id": group_name,
-                    "name": group_name,
-                    "path": group_name,
-                    "config_name": None,
-                    "task_name": group_name,
-                    "description": f"Task Group: {group_name}",
-                    "local_path": matched_local_path,
-                    "is_local": True,
-                    "splits": splits,
-                    "num_examples": num_examples,
-                    "category": infer_category(group_name),
-                    "tags": ["group"],
-                    "output_type": None # Group 没有单一 output_type
-                }
-                 datasets.append(dataset_info)
-
-        # 4. 处理未匹配的本地数据集 (Fallback)
-        # 这些可能是自定义数据集，或者 TaskManager 中没有定义的
-        for (d_path, d_config), local_path in local_data_map.items():
-            if local_path not in processed_local_paths:
-                # 这是一个未被任何 Task 认领的数据集
-                # 我们仍然显示它，但在 task_name 上可能为空，或者尽力推断
                 
-                dataset_name = d_path.replace("/", "_")
-                if d_config:
-                    dataset_name += f"_{d_config}"
-                
-                splits, num_examples = None, None
-                try:
-                    ds_obj = load_from_disk(local_path)
-                    splits = list(ds_obj.keys())
-                    num_examples = {split: len(ds_obj[split]) for split in splits}
-                except Exception:
-                    pass
-                
+            dataset_name = dir_path.name
+            
+            # 检查是否是数据集（直接包含文件）或数据集组（包含子目录）
+            # 我们不需要详细检查，只要它存在于 data 目录下，我们就认为它是用户想要的数据集/任务
+            # 但为了准确性，我们还是简单检查一下内容
+            
+            is_direct_dataset = False
+            is_dataset_group = False
+            
+            # 检查直接包含数据集文件
+            if (dir_path / 'dataset_dict.json').exists() or \
+               (dir_path / 'dataset_info.json').exists() or \
+               any(f.endswith('.arrow') for f in dir_path.iterdir() if f.is_file()):
+                is_direct_dataset = True
+            
+            # 检查子目录是否包含数据集文件
+            if not is_direct_dataset:
+                for sub_dir in dir_path.iterdir():
+                    if sub_dir.is_dir():
+                        if (sub_dir / 'dataset_dict.json').exists() or \
+                           (sub_dir / 'dataset_info.json').exists() or \
+                           any(f.endswith('.arrow') for f in sub_dir.iterdir() if f.is_file()):
+                            is_dataset_group = True
+                            break
+            
+            if is_direct_dataset or is_dataset_group:
+                # 创建数据集条目
                 dataset_info = {
-                    "id": generate_dataset_id(d_path, d_config),
+                    "id": dataset_name,
                     "name": dataset_name,
-                    "path": d_path,
-                    "config_name": d_config,
-                    "task_name": None, # 无法确定 Task
-                    "description": "Unknown Task / Custom Dataset",
-                    "local_path": local_path,
+                    "path": dataset_name,
+                    "config_name": None, # 对于顶层文件夹，config_name 通常为空或不适用
+                    "task_name": dataset_name, # 默认假设文件夹名就是任务名
+                    "description": f"Task: {dataset_name}",
+                    "local_path": str(dir_path),
                     "is_local": True,
-                    "splits": splits,
-                    "num_examples": num_examples,
-                    "category": infer_category(d_path),
-                    "tags": ["custom"],
+                    "splits": None, # 暂时跳过 splits 统计，提高速度
+                    "num_examples": None,
+                    "category": infer_category(dataset_name),
+                    "tags": ["group"] if is_dataset_group else [],
                     "output_type": None
                 }
+                
+                # 尝试从 TaskManager 验证任务名称
+                try:
+                    from lm_eval.tasks import TaskManager
+                    task_manager = TaskManager()
+                    # 检查是否匹配 Group 或 Task
+                    if dataset_name in task_manager.all_groups:
+                         dataset_info["tags"].append("lm_eval_group")
+                    elif dataset_name in task_manager.all_subtasks:
+                         dataset_info["tags"].append("lm_eval_task")
+                    # 如果都不匹配，保留 task_name 但可能无法运行
+                except Exception:
+                    pass
+
+                # 合并已保存的元数据
+                metadata_key = dataset_name
+                if metadata_key in saved_metadata:
+                     saved_meta = saved_metadata[metadata_key]
+                     if "description" in saved_meta: dataset_info["description"] = saved_meta["description"]
+                     if "category" in saved_meta: dataset_info["category"] = saved_meta["category"]
+                     if "tags" in saved_meta: dataset_info["tags"] = list(set(dataset_info["tags"] + saved_meta["tags"]))
+                
                 datasets.append(dataset_info)
 
-    except Exception as e:
-        print(f"Rebuild index error: {e}")
-        # 如果 TaskManager 失败，回退到原来的简单扫描逻辑
-        # (这里为了简洁省略回退代码，实际生产中应保留)
-        pass
+    # 2. 从 TaskManager 获取所有任务，并匹配本地数据
+    # (已移除：不再遍历所有子任务，只关注本地顶层目录)
+
     
     # 排序：有 task_name 的排前面，然后按名称排
     datasets.sort(key=lambda x: (x["task_name"] is None, x["name"]))

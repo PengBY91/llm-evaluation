@@ -176,33 +176,31 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     base_url = base_url + "/v1/chat/completions"
             elif model_type == "openai-completions":
-                # 对于 completions 模型，添加 /v1/completions
+                # 对于 completions 模型，如果用户没有提供路径，添加 /v1/completions
+                # 但如果用户已经提供了包含 /v1/completions 的完整 URL（在前端提示中是这样），则不重复添加
+                # 这里只处理纯域名的情况
                 if base_url.endswith("/"):
                     base_url = base_url.rstrip("/") + "/v1/completions"
                 else:
                     base_url = base_url + "/v1/completions"
         
+        # 移除自动添加逻辑，因为前端现在提示用户输入完整 URL
+        # 如果 base_url 已经是完整的（包含 /v1/completions），则直接使用
         model_args["base_url"] = base_url
-    
-    # 对于 API 模型，api_key 可以通过多种方式传递：
-    # 1. 通过 api_key 参数直接传递（OpenAIChatCompletion 等类已支持）
-    # 2. 通过环境变量 OPENAI_API_KEY（如果 api_key 参数没有提供）
-    # 注意：不要通过 header 参数传递，因为 api_models.py 的 header 属性会自动添加 "Bearer " 前缀
-    if model.get("api_key"):
-        # 只传递 api_key 参数，让 api_models.py 的 header 属性自动处理 "Bearer " 前缀
-        model_args["api_key"] = model["api_key"]
     
     if model.get("max_concurrent"):
         model_args["num_concurrent"] = model["max_concurrent"]
+        
+    if model.get("max_tokens"):
+        model_args["max_length"] = model["max_tokens"]
+        
+    if model.get("api_key"):
+        model_args["api_key"] = model["api_key"]
     
-    # port 不再单独传递，已包含在 base_url 中
-    # 但为了兼容某些可能需要单独 port 的场景，如果 base_url 中没有端口，仍传递 port
-    if port and base_url and ":" not in base_url.split("//")[1].split("/")[0]:
-        model_args["port"] = port
-    
+    # 合并其他配置
     if model.get("other_config"):
         model_args.update(model["other_config"])
-    
+        
     return model_args
 
 
