@@ -2,6 +2,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic
 python-multipart==0.0.6
+numba>=0.58.0
 datasets>=2.14.0
 requests>=2.31.0
 

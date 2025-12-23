@@ -7,6 +7,8 @@ venv/
 ENV/
 env/
 *.env
+datasets_metadata/
+lm_eval/tasks/
 
 models/
 results/
