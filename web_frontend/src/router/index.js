@@ -4,6 +4,7 @@ import ModelsView from '../views/ModelsView.vue'
 import DatasetsView from '../views/DatasetsView.vue'
 import DatasetDetailView from '../views/DatasetDetailView.vue'
 import TaskDetailView from '../views/TaskDetailView.vue'
+import ManualEvalView from '../views/ManualEvalView.vue'
 
 const routes = [
   {
@@ -34,6 +35,11 @@ const routes = [
     path: '/datasets/:id',
     name: 'DatasetDetail',
     component: DatasetDetailView
+  },
+  {
+    path: '/manual-evaluation',
+    name: 'ManualEvaluation',
+    component: ManualEvalView
   }
 ]
 

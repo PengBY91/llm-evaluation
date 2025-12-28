@@ -24,6 +24,10 @@
             <el-icon><FolderOpened /></el-icon>
             <span>数据集管理</span>
           </el-menu-item>
+          <el-menu-item index="/manual-evaluation">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>手动评测</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       <el-main class="app-main">
@@ -36,7 +40,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { List, Setting, FolderOpened } from '@element-plus/icons-vue'
+import { List, Setting, FolderOpened, ChatDotRound } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)

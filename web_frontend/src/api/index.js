@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 60000  // 增加到 60 秒，对于大型数据集操作可能需要更长时间
+  timeout: 120000 // 120 seconds
 })
 
 // 请求拦截器
@@ -32,14 +32,14 @@ api.interceptors.response.use(
       timeoutError.isTimeout = true
       return Promise.reject(timeoutError)
     }
-    
+
     if (error.response) {
       // 服务器返回了错误响应
       const data = error.response.data
       // 保留完整的错误对象，让调用方可以访问 detail 等信息
       const errorObj = new Error(
-        data?.message || 
-        data?.detail || 
+        data?.message ||
+        data?.detail ||
         `请求失败: ${error.response.status} ${error.response.statusText}`
       )
       errorObj.response = error.response

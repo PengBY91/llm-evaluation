@@ -57,7 +57,8 @@ class DatasetInfo(BaseModel):
     num_examples: Optional[Dict[str, int]] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
-    output_type: Optional[str] = None  # 任务输出类型 (e.g. multiple_choice, generate_until)
+    output_type: Optional[str] = None
+    subtasks: Optional[List[str]] = None
 
 
 class DatasetAddRequest(BaseModel):
@@ -81,8 +82,9 @@ class DatasetResponse(BaseModel):
     splits: Optional[List[str]] = None
     num_examples: Optional[Dict[str, int]] = None
     category: Optional[str] = None  # 数据集类别
-    tags: Optional[List[str]] = None  # 标签列表
-    output_type: Optional[str] = None  # 任务输出类型
+    tags: Optional[List[str]] = None
+    output_type: Optional[str] = None
+    subtasks: Optional[List[str]] = None
 
 
 class DatasetListResponse(BaseModel):
@@ -197,7 +199,14 @@ def infer_category(dataset_path: str, task_name: Optional[str] = None, tags: Opt
 
 
 def rebuild_dataset_index() -> List[Dict[str, Any]]:
-    """重建数据集索引（扫描磁盘并保存到文件）"""
+    """重建数据集索引（扫描磁盘并保存到文件）
+    
+    扫描逻辑：
+    1. 对于直接包含 dataset_dict.json 的目录，作为单一数据集
+    2. 对于包含子数据集的目录（如 arc/ARC-Challenge），同时列出父目录和子目录
+       - 父目录标记为 "group"，选择它会评测所有子任务
+       - 子目录标记为具体的数据集，可单独选择
+    """
     global _datasets_cache
     
     try:
@@ -206,14 +215,13 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
         
         datasets = []
         
-        # 1. 扫描本地 data 目录，建立数据映射表
-        # 只扫描第一层目录
+        # 1. 扫描本地 data 目录
         if not DATA_DIR.exists():
             print(f"数据目录不存在: {DATA_DIR}")
             _datasets_cache = []
             return []
         
-        # 获取所有第一层子目录（优化：使用列表推导式）
+        # 获取所有第一层子目录
         try:
             top_level_dirs = [d for d in DATA_DIR.iterdir() 
                              if d.is_dir() 
@@ -231,64 +239,83 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
             try:
                 dataset_name = dir_path.name
                 
-                # 优化：快速检查是否是数据集
+                # 检查是否是直接数据集（直接包含 dataset_dict.json）
                 is_direct_dataset = (
                     (dir_path / 'dataset_dict.json').exists() or 
                     (dir_path / 'dataset_info.json').exists()
                 )
                 
-                # 优化：只有在不是直接数据集时才检查子目录
-                is_dataset_group = False
+                # 检查子目录
+                sub_datasets = []
                 if not is_direct_dataset:
                     try:
-                        # 限制检查深度，避免遍历所有文件
                         for sub_dir in dir_path.iterdir():
                             if sub_dir.is_dir():
                                 if ((sub_dir / 'dataset_dict.json').exists() or 
                                     (sub_dir / 'dataset_info.json').exists()):
-                                    is_dataset_group = True
-                                    break
+                                    sub_datasets.append(sub_dir)
                     except (PermissionError, OSError) as e:
                         print(f"无法访问子目录 {dir_path}: {e}")
                         continue
                 
-                if not is_direct_dataset and not is_dataset_group:
+                if not is_direct_dataset and not sub_datasets:
                     # 跳过非数据集目录
                     continue
                 
-                # 创建数据集条目
-                dataset_info = {
-                    "id": dataset_name,
-                    "name": dataset_name,
-                    "path": dataset_name,
-                    "config_name": None,
-                    "task_name": dataset_name,
-                    "description": f"Task: {dataset_name}",
-                    "local_path": str(dir_path),
-                    "is_local": True,
-                    "splits": None,
-                    "num_examples": None,
-                    "category": infer_category(dataset_name),
-                    "tags": ["group"] if is_dataset_group else [],
-                    "output_type": None
-                }
-                
-                # 延迟加载 TaskManager（避免每次都初始化）
+                # 延迟加载 TaskManager
                 if task_manager is None:
                     try:
                         from lm_eval.tasks import TaskManager
                         task_manager = TaskManager()
                     except Exception as e:
                         print(f"初始化 TaskManager 失败: {e}")
-                        # 继续处理，但不验证任务名称
                 
-                # 验证任务名称（如果 TaskManager 可用）
+                # 创建父目录条目（对于有子数据集的情况，这代表整个任务组）
+                is_group = len(sub_datasets) > 0
+                parent_info = {
+                    "id": dataset_name,
+                    "name": dataset_name,
+                    "path": dataset_name,
+                    "config_name": None,
+                    "task_name": dataset_name,
+                    "description": f"Task: {dataset_name}" + (f"（包含 {len(sub_datasets)} 个子任务）" if is_group else ""),
+                    "local_path": str(dir_path),
+                    "is_local": True,
+                    "splits": None,
+                    "num_examples": None,
+                    "category": infer_category(dataset_name),
+                    "tags": ["group"] if is_group else [],
+                    "output_type": None,
+                    "subtasks": [sub.name for sub in sub_datasets] if sub_datasets else None
+                }
+                
+                # 如果是直接数据集，尝试加载 split 信息
+                if is_direct_dataset:
+                    try:
+                        dataset = load_from_disk(str(dir_path))
+                        splits = list(dataset.keys())
+                        parent_info["splits"] = splits
+                        parent_info["num_examples"] = {split: len(dataset[split]) for split in splits}
+                    except Exception as e:
+                        print(f"扫描数据集 {dataset_name} 的 splits 失败: {e}")
+                elif is_group and sub_datasets:
+                    # 如果是组，且自己没有 splits，尝试从第一个子任务获取 splits 以供预览
+                    try:
+                        first_sub = sub_datasets[0]
+                        dataset = load_from_disk(str(first_sub))
+                        splits = list(dataset.keys())
+                        parent_info["splits"] = splits
+                        parent_info["num_examples"] = {split: len(dataset[split]) for split in splits}
+                    except Exception as e:
+                        print(f"扫描数据集组 {dataset_name} 的第一个子任务 splits 失败: {e}")
+                
+                # 验证任务名称
                 if task_manager is not None:
                     try:
                         if dataset_name in task_manager.all_groups:
-                            dataset_info["tags"].append("lm_eval_group")
+                            parent_info["tags"].append("lm_eval_group")
                         elif dataset_name in task_manager.all_subtasks:
-                            dataset_info["tags"].append("lm_eval_task")
+                            parent_info["tags"].append("lm_eval_task")
                     except Exception as e:
                         print(f"验证任务名称失败 {dataset_name}: {e}")
                 
@@ -296,16 +323,21 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
                 if dataset_name in saved_metadata:
                     try:
                         saved_meta = saved_metadata[dataset_name]
-                        if "description" in saved_meta:
-                            dataset_info["description"] = saved_meta["description"]
-                        if "category" in saved_meta:
-                            dataset_info["category"] = saved_meta["category"]
+                        # 合并所有常用字段
+                        for field in ["description", "category", "task_name", "output_type", "splits", "num_examples"]:
+                            if saved_meta.get(field) is not None:
+                                parent_info[field] = saved_meta[field]
+                        
                         if "tags" in saved_meta and isinstance(saved_meta["tags"], list):
-                            dataset_info["tags"] = list(set(dataset_info["tags"] + saved_meta["tags"]))
+                            parent_info["tags"] = list(set(parent_info["tags"] + saved_meta["tags"]))
                     except Exception as e:
                         print(f"合并元数据失败 {dataset_name}: {e}")
                 
-                datasets.append(dataset_info)
+                datasets.append(parent_info)
+                
+                # 子任务信息已经包含在父级的 subtasks 字段中
+                # 不再为每个子任务创建单独的索引条目
+                # lm-eval 会自动处理 group 下的子任务
                 
             except Exception as e:
                 print(f"处理数据集目录失败 {dir_path}: {e}")
@@ -420,34 +452,71 @@ async def list_datasets(
     category: Optional[str] = Query(None, description="按类别过滤"),
     is_local: Optional[bool] = Query(None, description="是否只显示本地数据集"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    search: Optional[str] = Query(None, description="搜索关键词")
+    page_size: int = Query(20, ge=1, le=500, description="每页数量（最大500）"),
+    search: Optional[str] = Query(None, description="搜索关键词"),
+    groups_only: bool = Query(False, description="是否只返回 Group 级别的数据集（不包含子任务）")
 ):
-    """获取数据集列表（支持分类过滤和分页）"""
+    """获取数据集列表（支持分类过滤和分页）
+    
+    groups_only=True 时只返回 Group 级别的数据集，用于数据集管理页面
+    groups_only=False 时返回所有数据集（包括子任务），用于任务创建
+    """
     all_datasets = load_all_datasets()
     
     # 过滤
-    filtered = all_datasets
+    filtered = []
     
-    if category:
-        filtered = [d for d in filtered if d.get("category") == category]
+    for d in all_datasets:
+        # 如果只要 Group，跳过子任务
+        if groups_only and d.get("parent"):
+            continue
+        
+        # 类别过滤
+        if category and d.get("category") != category:
+            continue
+        
+        # 本地状态过滤
+        if is_local is not None and d.get("is_local") != is_local:
+            continue
+        
+        # 搜索过滤
+        if search:
+            search_lower = search.lower()
+            matches = (
+                search_lower in d.get("name", "").lower() or
+                search_lower in d.get("path", "").lower() or
+                search_lower in d.get("description", "").lower() or
+                search_lower in d.get("task_name", "").lower() or
+                (d.get("config_name") and search_lower in d.get("config_name", "").lower())
+            )
+            if not matches:
+                continue
+        
+        filtered.append(d)
     
-    if is_local is not None:
-        filtered = [d for d in filtered if d.get("is_local") == is_local]
+    # 兼容旧代码：如果搜索结果是子任务，确保父 group 也被包含（仅在非 groups_only 模式）
+    if search and not groups_only:
+        matched_parents = set(d.get("parent") for d in filtered if d.get("parent"))
+        for d in all_datasets:
+            if d.get("id") in matched_parents and d not in filtered:
+                # 插入到开头
+                filtered.insert(0, d)
     
-    if search:
-        search_lower = search.lower()
-        filtered = [
-            d for d in filtered
-            if search_lower in d.get("name", "").lower() 
-            or search_lower in d.get("path", "").lower()
-            or search_lower in d.get("description", "").lower()
-        ]
+    # 排序：Group 在前，子任务紧随其后
+    def sort_key(d):
+        if d.get("parent"):
+            # 子任务排在其父 group 后面
+            return (d.get("parent"), 1, d.get("name", ""))
+        else:
+            # Group 按名称排序
+            return (d.get("id"), 0, "")
+    
+    filtered.sort(key=sort_key)
     
     # 获取所有类别
-    categories = sorted(set(d.get("category", "其他") for d in all_datasets))
+    categories = sorted(set(d.get("category", "其他") for d in all_datasets if d.get("category")))
     
-    # 分页
+    # 分页 - 按 group 计算页面，确保 group 和其子任务在同一页
     total = len(filtered)
     start = (page - 1) * page_size
     end = start + page_size
@@ -710,72 +779,17 @@ async def get_dataset_samples(
         raise HTTPException(status_code=500, detail=error_detail)
 
 
-@router.get("/{dataset_id}", response_model=DatasetResponse)
-async def get_dataset(dataset_id: str):
-    """获取单个数据集详情（支持 ID 或 Name）"""
-    all_datasets = load_all_datasets()
-    
-    # 1. 优先匹配 ID
-    for dataset_info in all_datasets:
-        if dataset_info.get("id") == dataset_id:
-            return DatasetResponse(**dataset_info)
-    
-    # 2. 兼容旧逻辑：匹配 Name
-    # 如果 dataset_id 包含 '/'，说明可能是路由匹配错误，应该匹配到更具体的路由
-    if '/' in dataset_id:
-        raise HTTPException(status_code=404, detail="数据集不存在")
-    
-    for dataset_info in all_datasets:
-        if dataset_info["name"] == dataset_id:
-            return DatasetResponse(**dataset_info)
-    
-    # 3. 如果没找到，尝试从本地查找（兼容旧代码）
-    # 注意：这里的 dataset_id 其实是 dataset_name
-    dataset_name = dataset_id
-    for dataset_dir in DATA_DIR.iterdir():
-        if dataset_dir.is_dir():
-            if dataset_dir.name == dataset_name.replace("/", "_"):
-                try:
-                    dataset = load_from_disk(str(dataset_dir))
-                    splits = list(dataset.keys())
-                    num_examples = {split: len(dataset[split]) for split in splits}
-                    
-                    return DatasetResponse(
-                        id=generate_dataset_id(dataset_name, None),
-                        name=dataset_name,
-                        path=dataset_name,
-                        local_path=str(dataset_dir),
-                        is_local=True,
-                        splits=splits,
-                        num_examples=num_examples
-                    )
-                except Exception:
-                    pass
-    
-    # 尝试从 HuggingFace 加载信息
-    try:
-        from datasets import get_dataset_infos
-        dataset_infos = get_dataset_infos(dataset_name)
-        
-        if dataset_infos:
-            info = dataset_infos[list(dataset_infos.keys())[0]]
-            return DatasetResponse(
-                id=generate_dataset_id(dataset_name, None),
-                name=dataset_name,
-                path=dataset_name,
-                is_local=False,
-                description=info.description,
-                splits=list(info.splits.keys()) if info.splits else None
-            )
-    except Exception:
-        pass
-    
-    raise HTTPException(status_code=404, detail="数据集不存在")
 
 
-@router.get("/{dataset_id}/readme")
+@router.get("/readme/{dataset_id:path}")
 async def get_dataset_readme(dataset_id: str):
-    """获取数据集 README 内容"""
+    """获取数据集 README 内容
+    
+    使用 :path 类型以支持包含 '/' 的 ID（如 arc/ARC-Challenge）
+    """
+    from urllib.parse import unquote
+    dataset_id = unquote(dataset_id)
+    
     all_datasets = load_all_datasets()
     dataset_info = None
     
@@ -936,18 +950,36 @@ async def add_dataset(request: DatasetAddRequest):
         raise HTTPException(status_code=400, detail=f"添加数据集失败: {str(e)}")
 
 
-@router.delete("/{dataset_name}")
-async def delete_dataset(dataset_name: str):
-    """删除本地数据集"""
+@router.delete("/{dataset_id:path}")
+async def delete_dataset(dataset_id: str):
+    """删除本地数据集
+    
+    使用 :path 类型以支持包含 '/' 的 ID（如 arc/ARC-Challenge）
+    """
     global _datasets_cache
+    
+    from urllib.parse import unquote
+    dataset_id = unquote(dataset_id)
     
     # 先查找数据集信息，以便删除元数据
     all_datasets = load_all_datasets()
     dataset_info = None
+    dataset_name = dataset_id  # 兼容旧代码
+    
+    # 优先通过 ID 匹配
     for ds in all_datasets:
-        if ds.get("name") == dataset_name:
+        if ds.get("id") == dataset_id:
             dataset_info = ds
+            dataset_name = ds.get("name", dataset_id)
             break
+    
+    # 兼容通过 name 匹配
+    if not dataset_info:
+        for ds in all_datasets:
+            if ds.get("name") == dataset_id:
+                dataset_info = ds
+                dataset_name = ds.get("name", dataset_id)
+                break
     
     dataset_path = DATA_DIR / dataset_name.replace("/", "_")
     
@@ -975,4 +1007,70 @@ async def delete_dataset(dataset_name: str):
         return {"message": "数据集已删除"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+
+
+@router.get("/{dataset_id:path}", response_model=DatasetResponse)
+async def get_dataset(dataset_id: str):
+    """获取单个数据集详情（支持 ID 或 Name）
+    
+    使用 :path 类型以支持包含 '/' 的 ID（如 arc/ARC-Challenge）
+    """
+    all_datasets = load_all_datasets()
+    
+    # URL 解码（前端可能会编码 /）
+    from urllib.parse import unquote
+    dataset_id = unquote(dataset_id)
+    
+    # 1. 优先匹配 ID（精确匹配）
+    for dataset_info in all_datasets:
+        if dataset_info.get("id") == dataset_id:
+            return DatasetResponse(**dataset_info)
+    
+    for dataset_info in all_datasets:
+        if dataset_info["name"] == dataset_id:
+            return DatasetResponse(**dataset_info)
+    
+    # 3. 如果没找到，尝试从本地查找（兼容旧代码）
+    # 注意：这里的 dataset_id 其实是 dataset_name
+    dataset_name = dataset_id
+    for dataset_dir in DATA_DIR.iterdir():
+        if dataset_dir.is_dir():
+            if dataset_dir.name == dataset_name.replace("/", "_"):
+                try:
+                    dataset = load_from_disk(str(dataset_dir))
+                    splits = list(dataset.keys())
+                    num_examples = {split: len(dataset[split]) for split in splits}
+                    
+                    return DatasetResponse(
+                        id=generate_dataset_id(dataset_name, None),
+                        name=dataset_name,
+                        path=dataset_name,
+                        local_path=str(dataset_dir),
+                        is_local=True,
+                        splits=splits,
+                        num_examples=num_examples
+                    )
+                except Exception:
+                    pass
+    
+    # 尝试从 HuggingFace 加载信息
+    try:
+        from datasets import get_dataset_infos
+        dataset_infos = get_dataset_infos(dataset_name)
+        
+        if dataset_infos:
+            info = dataset_infos[list(dataset_infos.keys())[0]]
+            return DatasetResponse(
+                id=generate_dataset_id(dataset_name, None),
+                name=dataset_name,
+                path=dataset_name,
+                is_local=False,
+                description=info.description,
+                splits=list(info.splits.keys()) if info.splits else None
+            )
+    except Exception:
+        pass
+    
+    raise HTTPException(status_code=404, detail="数据集不存在")
+
 

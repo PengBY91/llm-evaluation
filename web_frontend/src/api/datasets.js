@@ -6,9 +6,9 @@ export const datasetsApi = {
     return api.get('/datasets/', { params })
   },
   
-  // 获取数据集详情
-  getDataset(datasetName) {
-    return api.get(`/datasets/${datasetName}`)
+  // 获取数据集详情（ID 可能包含 /，需要 URL 编码）
+  getDataset(datasetId) {
+    return api.get(`/datasets/${encodeURIComponent(datasetId)}`)
   },
   
   // 添加数据集
@@ -16,9 +16,9 @@ export const datasetsApi = {
     return api.post('/datasets/', data)
   },
   
-  // 删除数据集
-  deleteDataset(datasetName) {
-    return api.delete(`/datasets/${datasetName}`)
+  // 删除数据集（ID 可能包含 /，需要 URL 编码）
+  deleteDataset(datasetId) {
+    return api.delete(`/datasets/${encodeURIComponent(datasetId)}`)
   },
   
   // 获取数据集样本
@@ -28,9 +28,9 @@ export const datasetsApi = {
     })
   },
   
-  // 获取数据集 README
+  // 获取数据集 README（新路由格式，支持包含 / 的 ID）
   getDatasetReadme(datasetId) {
-    return api.get(`/datasets/${datasetId}/readme`)
+    return api.get(`/datasets/readme/${encodeURIComponent(datasetId)}`)
   },
   
   // 刷新缓存

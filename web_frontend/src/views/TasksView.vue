@@ -1,97 +1,172 @@
 <template>
   <div class="tasks-view">
     <div class="view-header">
-      <h2>评测任务管理</h2>
+      <div class="header-title">
+        <h2>评测任务管理</h2>
+        <span class="header-subtitle">管理和监控所有的 LLM 评测实验</span>
+      </div>
       <div>
         <el-button 
           type="primary" 
           @click="handleCreateTaskClick"
           :loading="loadingAvailableTasks"
+          class="create-btn"
         >
           <el-icon><Plus /></el-icon>
-          新建任务
+          新建评测任务
         </el-button>
       </div>
     </div>
 
-    <el-table :data="tasks" v-loading="loading" stripe>
-      <el-table-column prop="name" label="任务名称" width="200" />
-      <el-table-column prop="model" label="模型" width="150">
+    <!-- 统计信息 -->
+    <div class="statistics-row">
+      <el-row :gutter="20">
+        <el-col :span="6">
+          <el-card shadow="hover" class="stat-card">
+            <template #footer>
+              <div class="stat-label">总计任务</div>
+            </template>
+            <div class="stat-value">{{ tasks.length }}</div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="hover" class="stat-card running">
+            <template #footer>
+              <div class="stat-label">运行中</div>
+            </template>
+            <div class="stat-value">{{ tasks.filter(t => t.status === 'running').length }}</div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="hover" class="stat-card completed">
+            <template #footer>
+              <div class="stat-label">已完成</div>
+            </template>
+            <div class="stat-value">{{ tasks.filter(t => t.status === 'completed').length }}</div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="hover" class="stat-card failed">
+            <template #footer>
+              <div class="stat-label">失败</div>
+            </template>
+            <div class="stat-value">{{ tasks.filter(t => t.status === 'failed').length }}</div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
+
+    <el-table :data="tasks" v-loading="loading" stripe class="main-table" header-cell-class-name="table-header">
+      <el-table-column prop="name" label="任务详情" min-width="250">
         <template #default="{ row }">
-          {{ row.model_name || row.model }}
+          <div class="task-info">
+            <div class="task-name">{{ row.name }}</div>
+            <div class="task-meta">
+              <el-icon><Monitor /></el-icon> {{ row.model_name || row.model }}
+            </div>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column prop="tasks" label="评测任务" width="300">
+      <el-table-column prop="tasks" label="评测数据集" min-width="300">
         <template #default="{ row }">
-          <div v-if="row.datasets && row.datasets.length > 0">
-             <div v-for="ds in row.datasets" :key="ds.id" style="margin-bottom: 4px;">
-                <el-tag size="small" style="margin-right: 5px;">
-                  <span v-if="ds.config_name && !ds.name.includes(ds.config_name)">
-                     {{ ds.name }} ({{ ds.config_name }})
-                  </span>
-                  <span v-else-if="ds.path && ds.path !== ds.name">
-                     {{ ds.name }} ({{ ds.path }})
-                  </span>
-                  <span v-else>
-                     {{ ds.name }}
-                  </span>
-                </el-tag>
-             </div>
-          </div>
-          <div v-else>
-             <el-tag v-for="task in row.tasks" :key="task" size="small" style="margin-right: 5px; margin-bottom: 2px;">
-               {{ task }}
-             </el-tag>
+          <div class="dataset-tags">
+            <template v-if="row.datasets && row.datasets.length > 0">
+              <el-tag 
+                v-for="ds in row.datasets" 
+                :key="ds.id" 
+                size="small" 
+                effect="plain"
+                class="dataset-tag"
+              >
+                <span v-if="ds.config_name && !ds.name.includes(ds.config_name)">
+                   {{ ds.name }} ({{ ds.config_name }})
+                </span>
+                <span v-else-if="ds.path && ds.path !== ds.name">
+                   {{ ds.name }} ({{ ds.path }})
+                </span>
+                <span v-else>
+                   {{ ds.name }}
+                </span>
+              </el-tag>
+            </template>
+            <template v-else>
+               <el-tag v-for="task in row.tasks" :key="task" size="small" effect="plain" class="dataset-tag">
+                 {{ task }}
+               </el-tag>
+            </template>
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="status" label="状态" width="100">
+      <el-table-column prop="status" label="当前状态" width="120">
         <template #default="{ row }">
-          <el-tag :type="getStatusType(row.status)">
+          <el-tag :type="getStatusType(row.status)" effect="dark" class="status-tag">
             {{ getStatusText(row.status) }}
           </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="创建时间" width="180">
         <template #default="{ row }">
-          {{ formatTime(row.created_at) }}
+          <div class="time-cell">
+            <el-icon><Clock /></el-icon>
+            <span>{{ formatTime(row.created_at) }}</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="viewTask(row.id)">查看</el-button>
-          <el-button 
-            size="small" 
-            type="success" 
-            @click="downloadResults(row.id)"
-            :disabled="row.status !== 'completed'"
-          >
-            下载结果
-          </el-button>
-          <el-button 
-            size="small" 
-            type="primary" 
-            @click="startTask(row.id)"
-            :disabled="row.status === 'running' || row.status === 'pending'"
-          >
-            启动
-          </el-button>
-          <el-button 
-            size="small" 
-            type="warning" 
-            @click="stopTask(row.id)"
-            :disabled="row.status !== 'running'"
-          >
-            终止
-          </el-button>
-          <el-button 
-            size="small" 
-            type="danger" 
-            @click="deleteTask(row.id)"
-            :disabled="row.status === 'running'"
-          >
-            删除
-          </el-button>
+          <div class="action-buttons">
+            <el-tooltip content="查看详情" placement="top">
+              <el-button circle size="small" @click="viewTask(row.id)"><el-icon><View /></el-icon></el-button>
+            </el-tooltip>
+            
+            <el-tooltip content="下载结果" placement="top">
+              <el-button 
+                circle 
+                size="small" 
+                type="success" 
+                @click="downloadResults(row.id)"
+                :disabled="row.status !== 'completed'"
+              >
+                <el-icon><Download /></el-icon>
+              </el-button>
+            </el-tooltip>
+
+            <el-tooltip content="启动任务" placement="top">
+              <el-button 
+                circle 
+                size="small" 
+                type="primary" 
+                @click="startTask(row.id)"
+                :disabled="row.status === 'running' || row.status === 'pending'"
+              >
+                <el-icon><VideoPlay /></el-icon>
+              </el-button>
+            </el-tooltip>
+
+            <el-tooltip content="终止任务" placement="top">
+              <el-button 
+                circle 
+                size="small" 
+                type="warning" 
+                @click="stopTask(row.id)"
+                :disabled="row.status !== 'running'"
+              >
+                <el-icon><VideoPause /></el-icon>
+              </el-button>
+            </el-tooltip>
+
+            <el-tooltip content="删除任务" placement="top">
+              <el-button 
+                circle 
+                size="small" 
+                type="danger" 
+                @click="deleteTask(row.id)"
+                :disabled="row.status === 'running'"
+              >
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -100,54 +175,72 @@
     <el-dialog 
       v-model="showCreateDialog" 
       title="新建评测任务" 
-      width="800px"
+      width="850px"
       :close-on-click-modal="false"
       @opened="handleDialogOpened"
+      class="custom-dialog"
     >
-      <el-form :model="taskForm" label-width="120px">
-        <el-form-item label="任务名称" required>
-          <el-input v-model="taskForm.name" placeholder="请输入任务名称" />
-        </el-form-item>
-        <el-form-item label="选择模型">
-          <el-select 
-            v-model="selectedModelId" 
-            clearable 
-            placeholder="选择已有模型（可选，选择后会自动填充模型参数）"
-            @change="handleModelSelect"
-          >
-            <el-option 
-              v-for="model in models" 
-              :key="model.id" 
-              :label="model.name" 
-              :value="model.id" 
-            >
-              <div>
-                <div>{{ model.name }}</div>
-                <div style="font-size: 12px; color: #999;">{{ getModelTypeLabel(model.model_type) }}</div>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="模型参数" required>
-          <el-input 
-            v-model="modelArgsStr" 
-            type="textarea" 
-            :rows="3"
-            placeholder='例如: {"model": "gpt-3.5-turbo", "base_url": "https://api.example.com/v1"}'
-          />
-        </el-form-item>
-        <el-form-item label="模型类型" required>
-          <el-select v-model="taskForm.model" placeholder="请选择模型类型">
-            <el-option label="OpenAI Chat Completions" value="openai-chat-completions" />
-            <el-option label="OpenAI Completions" value="openai-completions" />
-            <el-option label="HuggingFace" value="hf" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="评测任务" required>
+      <el-form :model="taskForm" label-position="top" class="task-form">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="任务名称" required>
+              <el-input v-model="taskForm.name" placeholder="请输入任务名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="选择已有模型（可选）">
+              <el-select 
+                v-model="selectedModelId" 
+                clearable 
+                placeholder="从已注册模型中选择"
+                @change="handleModelSelect"
+                style="width: 100%"
+              >
+                <el-option 
+                  v-for="model in models" 
+                  :key="model.id" 
+                  :label="model.name" 
+                  :value="model.id" 
+                >
+                  <div class="model-option">
+                    <span>{{ model.name }}</span>
+                    <el-tag size="small" type="info">{{ getModelTypeLabel(model.model_type) }}</el-tag>
+                  </div>
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="模型接口类型" required>
+              <el-select v-model="taskForm.model" placeholder="请选择模型类型" style="width: 100%">
+                <el-option label="OpenAI Chat Completions" value="openai-chat-completions" />
+                <el-option label="OpenAI Completions" value="openai-completions" />
+                <el-option label="HuggingFace" value="hf" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="模型参数" required tooltip="模型名称、API地址等关键参数">
+              <el-input 
+                v-model="modelArgsStr" 
+                type="textarea" 
+                :rows="3"
+                placeholder='例如: {"model": "gpt-3.5-turbo", "base_url": "https://api.example.com/v1"}'
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="选择评测任务" required>
           <el-select 
             v-model="taskForm.tasks" 
             multiple 
-            placeholder="请选择评测任务（点击下拉框加载 /data 目录下的数据集）"
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="请选择评测任务"
             style="width: 100%"
             :loading="loadingAvailableTasks"
             filterable
@@ -156,8 +249,8 @@
             value-key="id"
           >
             <el-option 
-              v-for="dataset in availableTasks.filter(d => d.task_name)" 
-              :key="dataset.id" 
+              v-for="dataset in availableTasks.filter(d => d.task_name)"
+              :key="dataset.id"
               :label="getDatasetLabel(dataset)" 
               :value="dataset"
               :disabled="!getDatasetCompatibilityInfo(dataset).compatible"
@@ -167,66 +260,76 @@
                 :content="getDatasetCompatibilityInfo(dataset).reason" 
                 placement="right"
               >
-                <div style="opacity: 0.6; cursor: not-allowed;">
-                  <div style="display: flex; align-items: center;">
-                    <span style="font-weight: 500;">
-                      {{ dataset.name }}
-                      <span v-if="dataset.config_name && dataset.name !== dataset.config_name" style="font-weight: normal; font-size: 13px;">
-                        ({{ dataset.config_name }})
-                      </span>
-                    </span>
-                    <el-tag size="small" type="danger" style="margin-left: 5px;">不支持</el-tag>
-                  </div>
-                  <div style="font-size: 12px; color: #999;" v-if="dataset.path && dataset.path !== dataset.name">
-                    Dataset: {{ dataset.path }}{{ dataset.config_name ? ` / ${dataset.config_name}` : '' }}
-                  </div>
+                <div class="dataset-option disabled">
+                  <span class="dataset-name">{{ dataset.name }}</span>
+                  <el-tag size="small" type="danger">不支持</el-tag>
                 </div>
               </el-tooltip>
-              <div v-else>
-                <div style="font-weight: 500;">
-                  {{ dataset.name }}
-                  <span v-if="dataset.config_name && dataset.name !== dataset.config_name" style="font-weight: normal; color: #666; font-size: 13px;">
-                    ({{ dataset.config_name }})
-                  </span>
-                </div>
-                <div style="font-size: 12px; color: #999;" v-if="dataset.path && dataset.path !== dataset.name">
-                  Dataset: {{ dataset.path }}{{ dataset.config_name ? ` / ${dataset.config_name}` : '' }}
+              <div v-else class="dataset-option">
+                <span class="dataset-name">{{ dataset.name }}</span>
+                <div class="dataset-extra">
+                  <el-tag v-if="dataset.subtasks && dataset.subtasks.length > 0" size="small" type="info">
+                    {{ dataset.subtasks.length }} 个子任务
+                  </el-tag>
+                  <el-icon v-if="dataset.tags && (dataset.tags.includes('lm_eval_group') || dataset.tags.includes('lm_eval_task'))" color="#67C23A"><CircleCheck /></el-icon>
                 </div>
               </div>
             </el-option>
           </el-select>
-          <div v-if="loadingAvailableTasks" style="font-size: 12px; color: #999; margin-top: 5px;">
-            正在从 /data 目录加载数据集...
+          <div class="task-help">
+            <template v-if="loadingAvailableTasks">
+              <el-icon class="is-loading"><Loading /></el-icon> 正在从 /data 目录加载数据集...
+            </template>
+            <template v-else-if="availableTasks.length > 0">
+              共 {{ availableTasks.filter(d => d.task_name).length }} 个可用评测任务 
+              <span class="tip">💡 包含子任务的评测会自动测试所有子任务并汇总结果</span>
+            </template>
+            <template v-else>
+              点击下拉框加载 /data 目录下的数据集
+            </template>
           </div>
-          <div v-else-if="availableTasks.length > 0" style="font-size: 12px; color: #999; margin-top: 5px;">
-            共 {{ availableTasks.length }} 个数据集，其中 {{ availableTasks.filter(d => d.task_name).length }} 个可用于创建评测任务 
-            <span v-if="availableTasks.filter(d => !d.task_name).length > 0">
-              （{{ availableTasks.filter(d => !d.task_name).length }} 个未匹配到任务，已禁用）
-            </span>
-          </div>
-          <div v-else-if="availableTasks.length === 0" style="font-size: 12px; color: #999; margin-top: 5px;">
-            点击下拉框加载 /data 目录下的数据集
-          </div>
         </el-form-item>
-        <el-form-item label="Few-shot数量">
-          <el-input-number v-model="taskForm.num_fewshot" :min="0" />
-        </el-form-item>
-        <el-form-item label="Batch Size">
-          <el-input-number v-model="taskForm.batch_size" :min="1" />
-        </el-form-item>
-        <el-form-item label="限制样本数">
-          <el-input-number v-model="taskForm.limit" :min="1" />
-        </el-form-item>
-        <el-form-item label="应用Chat模板">
-          <el-switch v-model="taskForm.apply_chat_template" />
-        </el-form-item>
-        <el-form-item label="记录样本">
-          <el-switch v-model="taskForm.log_samples" />
-        </el-form-item>
+
+        <el-divider content-position="left">运行配置</el-divider>
+
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="Few-shot 数量">
+              <el-input-number v-model="taskForm.num_fewshot" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="Batch Size">
+              <el-input-number v-model="taskForm.batch_size" :min="1" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="样本限制">
+              <el-input-number v-model="taskForm.limit" :min="1" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="应用 Chat 模板">
+              <el-switch v-model="taskForm.apply_chat_template" inline-prompt active-text="是" inactive-text="否" />
+              <span class="switch-tip">如果是对话模型，建议开启</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="记录模型样本">
+              <el-switch v-model="taskForm.log_samples" inline-prompt active-text="是" inactive-text="否" />
+              <span class="switch-tip">开启后可下载详细评测样本</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="createTask">创建</el-button>
+        <span class="dialog-footer">
+          <el-button @click="showCreateDialog = false">取消</el-button>
+          <el-button type="primary" @click="createTask">创建任务</el-button>
+        </span>
       </template>
     </el-dialog>
   </div>
@@ -236,7 +339,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Refresh, Monitor, Clock, View, Download, VideoPlay, VideoPause, Delete, CircleCheck, Loading } from '@element-plus/icons-vue'
 import { tasksApi } from '../api/tasks'
 import { modelsApi } from '../api/models'
 import { datasetsApi } from '../api/datasets'
@@ -310,62 +413,6 @@ const getDatasetLabel = (dataset) => {
     return `${dataset.name} (${dataset.config_name})`
   }
   return dataset.name
-}
-
-const isDatasetCompatible = (dataset) => {
-  // 如果没有选择模型类型，默认都兼容
-  if (!taskForm.value.model) return true
-  
-  // 检查模型类型是否为 chat completions
-  const isChatInterface = taskForm.value.model === 'openai-chat-completions'
-  
-  const taskName = (dataset.task_name || dataset.name).toLowerCase()
-  const outputType = dataset.output_type ? dataset.output_type.toLowerCase() : null
-  
-  // 只有在使用 Chat Completions 接口（不支持 logprobs）时才进行严格检查
-  // 如果使用的是 Completions 接口（默认），则支持所有任务
-  if (isChatInterface) {
-    // 1. 如果 output_type 明确为 loglikelihood，则不兼容
-    // 除非它是 generative 任务（虽然通常 generative 对应 generate_until）
-    if (outputType === 'loglikelihood' || outputType === 'loglikelihood_rolling') {
-       // 再检查一下任务名称是否包含 cot/gen，因为有时候 output_type 可能是 loglikelihood 但通过特殊方式支持（较少见）
-       if (taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')) {
-           return true
-       }
-       // 既然我们现在主要用 Completions 接口，其实是支持 loglikelihood 的。
-       // 但是这里 isChatModel 判断的是 model.includes('chat')，
-       // 而我们的默认模型类型虽然叫 openai-completions，但如果用户在创建时选择了 chat...
-       // 等等，我们已经在 ModelsView 强制把类型改成了 openai-completions。
-       // 只要用户使用的是 Completions 接口，就支持 logprobs。
-       // 只有当用户显式选择 Chat Completions 接口（不支持 logprobs）时才需要警告。
-       return false
-    }
-    
-    // 2. 如果 output_type 明确为 multiple_choice (通常也是 loglikelihood)
-    if (outputType === 'multiple_choice') {
-        if (taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')) {
-           return true
-       }
-       return false
-    }
-
-    // 3. 如果 output_type 是 generate_until，则兼容
-    if (outputType === 'generate_until') {
-        return true
-    }
-
-    // 4. 如果 output_type 未知，回退到基于名称的启发式判断
-    // 检查是否是已知需要 loglikelihood 的任务
-    const loglikelihoodTasks = ['mmlu', 'hellaswag', 'arc', 'winogrande', 'piqa', 'lambada', 'sciq', 'boolq', 'triviaqa']
-    const isLoglikelihoodTask = loglikelihoodTasks.some(t => taskName.includes(t))
-    const isGenerative = taskName.includes('cot') || taskName.includes('generative') || taskName.includes('gen')
-    
-    if (isLoglikelihoodTask && !isGenerative) {
-       return false
-    }
-  }
-  
-  return true
 }
 
 const getDatasetCompatibilityInfo = (dataset) => {
@@ -499,6 +546,7 @@ const createTask = async () => {
     })
     
     // 构建请求数据，包含数据集信息
+    // 注意：lm-eval 会自动处理 Group 下的子任务，不需要前端展开
     const requestData = {
       ...taskForm.value,
       tasks: taskNames,  // 使用正确的任务名称（优先 task_name）
@@ -506,8 +554,8 @@ const createTask = async () => {
         .filter(task => typeof task === 'object' && task !== null)
         .map(task => ({
           id: task.id,
-          name: task.name,  // 数据集显示名称（文件夹名称）
-          task_name: task.task_name,  // 正确的任务名称（从 TaskManager 获取，用于评测）
+          name: task.name,  // 数据集显示名称
+          task_name: task.task_name,  // 正确的任务名称
           path: task.path,
           config_name: task.config_name
         }))
@@ -717,6 +765,7 @@ const loadAvailableTasks = async () => {
     while (hasMore) {
       const response = await datasetsApi.getDatasets({
         is_local: true,  // 只获取本地数据集
+        groups_only: true,  // 只获取 Group 级别的数据集
         page: page,
         page_size: pageSize
       })
@@ -835,27 +884,189 @@ onMounted(() => {
 
 <style scoped>
 .tasks-view {
-  background: white;
-  padding: 20px;
-  border-radius: 4px;
+  background: transparent;
+  padding: 0;
 }
 
 .view-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
 }
 
-.view-header h2 {
+.header-title h2 {
   margin: 0;
+  font-size: 24px;
+  color: #303133;
+  font-weight: 600;
 }
 
-pre {
-  background: #f5f5f5;
-  padding: 10px;
+.header-subtitle {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 4px;
+  display: block;
+}
+
+.create-btn {
+  padding: 12px 20px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+/* 统计卡片 */
+.statistics-row {
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  text-align: center;
+  border-radius: 12px;
+  border: none;
+  transition: transform 0.3s;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+}
+
+.stat-card.running .stat-value { color: #e6a23c; }
+.stat-card.completed .stat-value { color: #67c23a; }
+.stat-card.failed .stat-value { color: #f56c6c; }
+
+/* 表格样式 */
+.main-table {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+}
+
+:deep(.table-header) {
+  background-color: #f5f7fa !important;
+  color: #606266;
+  font-weight: 600;
+}
+
+.task-info .task-name {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.task-meta {
+  font-size: 12px;
+  color: #909399;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dataset-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dataset-tag {
   border-radius: 4px;
-  overflow-x: auto;
+}
+
+.status-tag {
+  min-width: 80px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.time-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #606266;
+  font-size: 13px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* 对话框与表单 */
+.custom-dialog :deep(.el-dialog) {
+  border-radius: 16px;
+}
+
+.task-form {
+  padding: 10px 0;
+}
+
+.model-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.dataset-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.dataset-option.disabled {
+  opacity: 0.6;
+}
+
+.dataset-name {
+  font-weight: 500;
+}
+
+.dataset-extra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-help {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-help .tip {
+  color: #409eff;
+}
+
+.switch-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 12px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 </style>
 

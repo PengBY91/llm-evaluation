@@ -79,6 +79,7 @@ class DatasetInfo(BaseModel):
     task_name: Optional[str] = None  # 正确的任务名称（从 TaskManager 获取，用于评测）
     path: Optional[str] = None
     config_name: Optional[str] = None
+    subtasks: Optional[List[str]] = None  # 子任务列表（如果是 group）
 
 
 class TaskCreateRequest(BaseModel):
@@ -364,20 +365,17 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
     if not final_model_args:
         raise HTTPException(status_code=400, detail="model_args 是必需的，请提供 model_id 或 model_args")
     
-    # 如果提供了数据集信息，优先使用数据集中的 task_name（正确的任务名称）
+    # 使用数据集中的 task_name（正确的任务名称）
+    # lm-eval 会自动处理 group 类型的任务，评测其下所有子任务
     if request.datasets and len(request.datasets) > 0:
-        # 使用数据集提供的 task_name（从 TaskManager 获取的正确任务名称）
+        # 从数据集信息中提取 task_name
         task_names_from_datasets = [ds.task_name for ds in request.datasets if ds.task_name]
         
-        # 优先使用数据集中的 task_name，因为它们应该是正确的
         if task_names_from_datasets:
             normalized_tasks = task_names_from_datasets
         else:
-            # 如果数据集中没有 task_name，使用 tasks 列表（前端传递的）
-            # 但需要验证这些任务名称是否有效
             normalized_tasks = request.tasks
     else:
-        # 如果没有提供数据集信息，直接使用 tasks（前端应该已经传递了正确的名称）
         normalized_tasks = request.tasks
     
     # 检查是否有无效的任务名称

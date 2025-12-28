@@ -15,7 +15,7 @@ import os
 # 将项目根目录添加到 python path，以便导入 lm_eval
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from api import tasks, datasets, models
+from api import tasks, datasets, models, manual_eval
 
 app = FastAPI(
     title="大模型评测任务管理平台",
@@ -48,6 +48,7 @@ app.add_middleware(
 app.include_router(tasks.router, prefix="/api/tasks", tags=["评测任务"])
 app.include_router(datasets.router, prefix="/api/datasets", tags=["数据集管理"])
 app.include_router(models.router, prefix="/api/models", tags=["模型管理"])
+app.include_router(manual_eval.router, prefix="/api/manual-eval", tags=["手动评测"])
 
 
 @app.get("/")

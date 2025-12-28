@@ -34,6 +34,25 @@
         </el-descriptions-item>
       </el-descriptions>
       
+      <!-- 子任务列表（如果有） -->
+      <div v-if="currentDataset.subtasks && currentDataset.subtasks.length > 0">
+        <el-divider />
+        <h3>子任务 ({{ currentDataset.subtasks.length }})</h3>
+        <p style="color: #666; font-size: 13px; margin-bottom: 15px;">
+          选择此数据集进行评测时，会自动测试以下所有子任务并汇总结果
+        </p>
+        <el-table :data="subtasksTable" border style="width: 100%; max-width: 800px;">
+          <el-table-column prop="name" label="子任务名称" min-width="150" />
+          <el-table-column prop="task_name" label="评测任务名" min-width="150">
+            <template #default="{ row }">
+              <span>{{ row.task_name }}</span>
+              <el-tag v-if="row.verified" size="small" type="success" style="margin-left: 5px;">✓</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="path" label="本地路径" min-width="200" show-overflow-tooltip />
+        </el-table>
+      </div>
+      
       <el-divider />
       
       <h3>Splits</h3>
@@ -41,6 +60,9 @@
         <el-tag v-for="split in currentDataset.splits" :key="split" style="margin-right: 5px;">
           {{ split }}
         </el-tag>
+        <span v-if="!currentDataset.splits || currentDataset.splits.length === 0" style="color: #999;">
+          暂无 Splits 信息
+        </span>
       </div>
       
       <el-divider v-if="currentDataset.num_examples" />
@@ -72,46 +94,60 @@
         </div>
         
         <div class="samples-preview">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <el-select v-model="selectedSplit" @change="loadSamples" style="width: 200px;">
-              <el-option 
-                v-for="split in currentDataset.splits" 
-                :key="split" 
-                :label="split" 
-                :value="split" 
-              />
-            </el-select>
-            <el-radio-group v-model="sampleDisplayFormat" size="small">
-              <el-radio-button label="json">JSON</el-radio-button>
-              <el-radio-button label="markdown">Markdown</el-radio-button>
-            </el-radio-group>
+          <div class="preview-toolbar">
+            <div class="toolbar-left">
+              <span class="toolbar-label">数据划分:</span>
+              <el-select v-model="selectedSplit" @change="loadSamples" size="default" style="width: 150px;">
+                <el-option 
+                  v-for="split in currentDataset.splits" 
+                  :key="split" 
+                  :label="split" 
+                  :value="split" 
+                />
+              </el-select>
+            </div>
+            <div class="toolbar-right">
+              <el-radio-group v-model="sampleDisplayFormat" size="small">
+                <el-radio-button label="json">JSON</el-radio-button>
+                <el-radio-button label="markdown">列表</el-radio-button>
+              </el-radio-group>
+            </div>
           </div>
-          <div v-if="loadingSamples" style="text-align: center; padding: 40px;">
-            <el-icon class="is-loading" style="font-size: 24px;"><Loading /></el-icon>
-            <div style="margin-top: 10px;">正在加载样本...</div>
+
+          <div v-if="loadingSamples" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>正在加载样本数据...</span>
           </div>
-          <div v-else-if="samples.length === 0" style="text-align: center; padding: 40px; color: #999; background: #f9f9f9; border-radius: 4px;">
-            暂无样本数据
+          
+          <div v-else-if="samples.length === 0" class="empty-samples">
+            <el-empty description="该 Split 下暂无样本数据" />
           </div>
-          <div v-else>
-            <div 
+
+          <div v-else class="samples-list">
+            <el-card 
               v-for="(sample, index) in samples" 
               :key="index" 
-              class="sample-item"
+              class="sample-card"
+              shadow="never"
             >
-              <div class="sample-header">
-                样本 {{ index + 1 }}
+              <template #header>
+                <div class="sample-card-header">
+                  <el-tag size="small" effect="dark" type="info">#{{ index + 1 }}</el-tag>
+                  <span class="sample-title">数据样例</span>
+                </div>
+              </template>
+              
+              <div v-if="sampleDisplayFormat === 'json'" class="json-wrap">
+                <pre class="sample-content-json">{{ formatSampleAsJson(sample) }}</pre>
               </div>
-              <pre 
-                v-if="sampleDisplayFormat === 'json'"
-                class="sample-content-json"
-              >{{ formatSampleAsJson(sample) }}</pre>
-              <div 
-                v-else
-                class="sample-content-markdown"
-                v-html="formatSampleAsMarkdown(sample)"
-              ></div>
-            </div>
+              
+              <div v-else class="fields-wrap">
+                <div v-for="(value, key) in sample" :key="key" class="field-item">
+                  <div class="field-label">{{ key }}</div>
+                  <div class="field-value">{{ formatValue(value) }}</div>
+                </div>
+              </div>
+            </el-card>
           </div>
         </div>
       </div>
@@ -133,7 +169,8 @@ import { datasetsApi } from '../api/datasets'
 const route = useRoute()
 const router = useRouter()
 
-const datasetId = route.params.id
+// ID 可能包含 /（如 arc/ARC-Challenge），需要解码
+const datasetId = decodeURIComponent(route.params.id)
 const loading = ref(false)
 const currentDataset = ref(null)
 const readmeContent = ref('')
@@ -149,6 +186,26 @@ const numExamplesTable = computed(() => {
     split,
     count: count.toLocaleString()
   }))
+})
+
+// 子任务表格数据
+const subtasksTable = computed(() => {
+  if (!currentDataset.value?.subtasks) return []
+  
+  const basePath = currentDataset.value.local_path || ''
+  const parentName = currentDataset.value.name || ''
+  
+  return currentDataset.value.subtasks.map(subtaskName => {
+    // 生成 task_name（转换格式：ARC-Challenge -> arc_challenge）
+    const taskName = subtaskName.toLowerCase().replace(/-/g, '_')
+    
+    return {
+      name: subtaskName,
+      task_name: taskName,
+      path: basePath ? `${basePath}/${subtaskName}` : subtaskName,
+      verified: true  // 假设已经验证过（后端会验证）
+    }
+  })
 })
 
 // 将样本格式化为 JSON 字符串
@@ -169,33 +226,16 @@ const escapeHtml = (text) => {
 
 // 将样本格式化为 Markdown 格式
 const formatSampleAsMarkdown = (sample) => {
-  let markdown = ''
-  for (const [key, value] of Object.entries(sample)) {
-    markdown += `### ${key}\n\n`
-    if (value === null || value === undefined) {
-      markdown += `*null*\n\n`
-    } else if (typeof value === 'object') {
-      markdown += `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n\n`
-    } else if (typeof value === 'string' && (value.includes('\n') || value.length > 100)) {
-      markdown += `\`\`\`\n${value}\n\`\`\`\n\n`
-    } else {
-      markdown += `${value}\n\n`
-    }
+  // 弃用的方法，逻辑已移至模板
+  return ""
+}
+
+const formatValue = (val) => {
+  if (val === null || val === undefined) return '-'
+  if (typeof val === 'object') {
+    return JSON.stringify(val, null, 2)
   }
-  // 简单的 Markdown 转 HTML
-  let html = markdown
-    .replace(/```json\n([\s\S]*?)```/g, (match, code) => {
-      return `<pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; margin: 8px 0; border-left: 3px solid #409eff;"><code style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px;">${escapeHtml(code.trim())}</code></pre>`
-    })
-    .replace(/```\n([\s\S]*?)```/g, (match, code) => {
-      return `<pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; margin: 8px 0; border-left: 3px solid #67c23a;"><code style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px;">${escapeHtml(code.trim())}</code></pre>`
-    })
-    .replace(/### (.*?)\n\n/g, '<h4 style="margin: 16px 0 8px 0; color: #409eff; font-size: 16px; font-weight: 600;">$1</h4>')
-    .replace(/\*(.*?)\*/g, '<em style="color: #909399;">$1</em>')
-    .replace(/\n\n/g, '</p><p style="margin: 8px 0;">')
-    .replace(/\n/g, '<br>')
-  
-  return `<p style="margin: 8px 0;">${html}</p>`
+  return String(val)
 }
 
 // 简单的 Markdown 格式化（用于 README）
@@ -264,7 +304,7 @@ const loadSamples = async () => {
     const result = await datasetsApi.getDatasetSamples(
       datasetName,
       selectedSplit.value,
-      2  // 只加载2条样例
+      5  // 加载 5 条样例
     )
     samples.value = Array.isArray(result) ? result : []
   } catch (error) {
@@ -277,8 +317,18 @@ const loadSamples = async () => {
   }
 }
 
-const refreshDataset = () => {
-  loadDatasetDetail()
+const refreshDataset = async () => {
+  loading.value = true
+  try {
+    await datasetsApi.refreshCache()
+    await loadDatasetDetail()
+    ElMessage.success('详情已刷新')
+  } catch (error) {
+    ElMessage.error('刷新失败')
+    loadDatasetDetail()
+  } finally {
+    loading.value = false
+  }
 }
 
 const goBack = () => {
@@ -339,45 +389,116 @@ onMounted(() => {
 
 .samples-preview {
   margin-top: 15px;
-}
-
-.sample-item {
-  margin-bottom: 20px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  background: #fcfcfc;
   padding: 15px;
-  background: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
 }
 
-.sample-header {
+.preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbar-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 60px 0;
+  color: #909399;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.loading-container .el-icon {
+  font-size: 28px;
+}
+
+.samples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sample-card {
+  border: 1px solid #ebeef5;
+}
+
+.sample-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sample-title {
   font-weight: bold;
-  margin-bottom: 10px;
-  color: #409eff;
+  font-size: 14px;
+}
+
+.json-wrap {
+  background: #282c34;
+  padding: 15px;
+  border-radius: 4px;
 }
 
 .sample-content-json {
   margin: 0;
-  padding: 10px;
-  background: white;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+  color: #abb2bf;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
-.sample-content-markdown {
-  padding: 10px;
-  background: white;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-size: 13px;
-  line-height: 1.5;
+.fields-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-item {
+  border-bottom: 1px dashed #f0f2f5;
+  padding-bottom: 8px;
+}
+
+.field-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.field-label {
+  font-size: 12px;
+  color: #909399;
+  font-weight: bold;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.field-value {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .not-found {
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
   padding: 50px;
 }
