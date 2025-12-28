@@ -24,13 +24,16 @@ DATASETS_METADATA_DIR.mkdir(parents=True, exist_ok=True)
 # 数据集索引文件
 INDEX_FILE = DATA_DIR / "datasets_index.json"
 
-# 数据集缓存
+# 数据集缓存（增加过期时间）
 _datasets_cache: Optional[List[Dict[str, Any]]] = None
 _cache_lock = threading.Lock()
+_cache_timestamp: Optional[float] = None  # 缓存时间戳
+CACHE_EXPIRE_SECONDS = 300  # 5分钟过期
 
-# 数据集样本缓存
+# 数据集样本缓存（增加大小限制）
 _samples_cache: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
 _samples_cache_lock = threading.Lock()
+MAX_SAMPLES_CACHE_SIZE = 100  # 最多缓存100个数据集的样本
 
 
 import hashlib
@@ -197,118 +200,158 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
     """重建数据集索引（扫描磁盘并保存到文件）"""
     global _datasets_cache
     
-    # 加载已保存的数据集元数据
-    saved_metadata = load_all_datasets_metadata()
-    
-    datasets = []
-    
-    # 1. 扫描本地 data 目录，建立数据映射表
-    # 只扫描第一层目录
-    local_data_map = {}
-    
-    if DATA_DIR.exists():
-        # 获取所有第一层子目录
-        top_level_dirs = [d for d in DATA_DIR.iterdir() if d.is_dir()]
+    try:
+        # 加载已保存的数据集元数据
+        saved_metadata = load_all_datasets_metadata()
+        
+        datasets = []
+        
+        # 1. 扫描本地 data 目录，建立数据映射表
+        # 只扫描第一层目录
+        if not DATA_DIR.exists():
+            print(f"数据目录不存在: {DATA_DIR}")
+            _datasets_cache = []
+            return []
+        
+        # 获取所有第一层子目录（优化：使用列表推导式）
+        try:
+            top_level_dirs = [d for d in DATA_DIR.iterdir() 
+                             if d.is_dir() 
+                             and not d.name.startswith('.') 
+                             and d.name not in ['datasets_metadata', 'tasks']]
+        except Exception as e:
+            print(f"读取数据目录失败: {e}")
+            _datasets_cache = []
+            return []
+        
+        # 延迟加载 TaskManager（仅在需要时加载）
+        task_manager = None
         
         for dir_path in top_level_dirs:
-            # 跳过特殊目录
-            if dir_path.name.startswith('.') or dir_path.name in ['datasets_metadata', 'tasks']:
-                continue
+            try:
+                dataset_name = dir_path.name
                 
-            dataset_name = dir_path.name
-            
-            # 检查是否是数据集（直接包含文件）或数据集组（包含子目录）
-            # 我们不需要详细检查，只要它存在于 data 目录下，我们就认为它是用户想要的数据集/任务
-            # 但为了准确性，我们还是简单检查一下内容
-            
-            is_direct_dataset = False
-            is_dataset_group = False
-            
-            # 检查直接包含数据集文件
-            if (dir_path / 'dataset_dict.json').exists() or \
-               (dir_path / 'dataset_info.json').exists() or \
-               any(f.endswith('.arrow') for f in dir_path.iterdir() if f.is_file()):
-                is_direct_dataset = True
-            
-            # 检查子目录是否包含数据集文件
-            if not is_direct_dataset:
-                for sub_dir in dir_path.iterdir():
-                    if sub_dir.is_dir():
-                        if (sub_dir / 'dataset_dict.json').exists() or \
-                           (sub_dir / 'dataset_info.json').exists() or \
-                           any(f.endswith('.arrow') for f in sub_dir.iterdir() if f.is_file()):
-                            is_dataset_group = True
-                            break
-            
-            if is_direct_dataset or is_dataset_group:
+                # 优化：快速检查是否是数据集
+                is_direct_dataset = (
+                    (dir_path / 'dataset_dict.json').exists() or 
+                    (dir_path / 'dataset_info.json').exists()
+                )
+                
+                # 优化：只有在不是直接数据集时才检查子目录
+                is_dataset_group = False
+                if not is_direct_dataset:
+                    try:
+                        # 限制检查深度，避免遍历所有文件
+                        for sub_dir in dir_path.iterdir():
+                            if sub_dir.is_dir():
+                                if ((sub_dir / 'dataset_dict.json').exists() or 
+                                    (sub_dir / 'dataset_info.json').exists()):
+                                    is_dataset_group = True
+                                    break
+                    except (PermissionError, OSError) as e:
+                        print(f"无法访问子目录 {dir_path}: {e}")
+                        continue
+                
+                if not is_direct_dataset and not is_dataset_group:
+                    # 跳过非数据集目录
+                    continue
+                
                 # 创建数据集条目
                 dataset_info = {
                     "id": dataset_name,
                     "name": dataset_name,
                     "path": dataset_name,
-                    "config_name": None, # 对于顶层文件夹，config_name 通常为空或不适用
-                    "task_name": dataset_name, # 默认假设文件夹名就是任务名
+                    "config_name": None,
+                    "task_name": dataset_name,
                     "description": f"Task: {dataset_name}",
                     "local_path": str(dir_path),
                     "is_local": True,
-                    "splits": None, # 暂时跳过 splits 统计，提高速度
+                    "splits": None,
                     "num_examples": None,
                     "category": infer_category(dataset_name),
                     "tags": ["group"] if is_dataset_group else [],
                     "output_type": None
                 }
                 
-                # 尝试从 TaskManager 验证任务名称
-                try:
-                    from lm_eval.tasks import TaskManager
-                    task_manager = TaskManager()
-                    # 检查是否匹配 Group 或 Task
-                    if dataset_name in task_manager.all_groups:
-                         dataset_info["tags"].append("lm_eval_group")
-                    elif dataset_name in task_manager.all_subtasks:
-                         dataset_info["tags"].append("lm_eval_task")
-                    # 如果都不匹配，保留 task_name 但可能无法运行
-                except Exception:
-                    pass
-
+                # 延迟加载 TaskManager（避免每次都初始化）
+                if task_manager is None:
+                    try:
+                        from lm_eval.tasks import TaskManager
+                        task_manager = TaskManager()
+                    except Exception as e:
+                        print(f"初始化 TaskManager 失败: {e}")
+                        # 继续处理，但不验证任务名称
+                
+                # 验证任务名称（如果 TaskManager 可用）
+                if task_manager is not None:
+                    try:
+                        if dataset_name in task_manager.all_groups:
+                            dataset_info["tags"].append("lm_eval_group")
+                        elif dataset_name in task_manager.all_subtasks:
+                            dataset_info["tags"].append("lm_eval_task")
+                    except Exception as e:
+                        print(f"验证任务名称失败 {dataset_name}: {e}")
+                
                 # 合并已保存的元数据
-                metadata_key = dataset_name
-                if metadata_key in saved_metadata:
-                     saved_meta = saved_metadata[metadata_key]
-                     if "description" in saved_meta: dataset_info["description"] = saved_meta["description"]
-                     if "category" in saved_meta: dataset_info["category"] = saved_meta["category"]
-                     if "tags" in saved_meta: dataset_info["tags"] = list(set(dataset_info["tags"] + saved_meta["tags"]))
+                if dataset_name in saved_metadata:
+                    try:
+                        saved_meta = saved_metadata[dataset_name]
+                        if "description" in saved_meta:
+                            dataset_info["description"] = saved_meta["description"]
+                        if "category" in saved_meta:
+                            dataset_info["category"] = saved_meta["category"]
+                        if "tags" in saved_meta and isinstance(saved_meta["tags"], list):
+                            dataset_info["tags"] = list(set(dataset_info["tags"] + saved_meta["tags"]))
+                    except Exception as e:
+                        print(f"合并元数据失败 {dataset_name}: {e}")
                 
                 datasets.append(dataset_info)
-
-    # 2. 从 TaskManager 获取所有任务，并匹配本地数据
-    # (已移除：不再遍历所有子任务，只关注本地顶层目录)
-
-    
-    # 排序：有 task_name 的排前面，然后按名称排
-    datasets.sort(key=lambda x: (x["task_name"] is None, x["name"]))
-    
-    # 保存到索引文件
-    try:
-        with open(INDEX_FILE, "w", encoding="utf-8") as f:
-            json.dump(datasets, f, ensure_ascii=False, indent=2)
-        print(f"数据集索引已保存到: {INDEX_FILE}")
+                
+            except Exception as e:
+                print(f"处理数据集目录失败 {dir_path}: {e}")
+                # 继续处理其他数据集
+                continue
+        
+        # 排序：有 task_name 的排前面，然后按名称排
+        try:
+            datasets.sort(key=lambda x: (x["task_name"] is None, x["name"]))
+        except Exception as e:
+            print(f"排序数据集失败: {e}")
+        
+        # 保存到索引文件
+        try:
+            with open(INDEX_FILE, "w", encoding="utf-8") as f:
+                json.dump(datasets, f, ensure_ascii=False, indent=2)
+            print(f"数据集索引已保存到: {INDEX_FILE}，共 {len(datasets)} 个数据集")
+        except Exception as e:
+            print(f"保存数据集索引失败: {e}")
+        
+        _datasets_cache = datasets
+        return datasets
+        
     except Exception as e:
-        print(f"保存数据集索引失败: {e}")
-    
-    _datasets_cache = datasets
-    return datasets
+        print(f"重建数据集索引失败: {e}")
+        import traceback
+        traceback.print_exc()
+        _datasets_cache = []
+        return []
 
 
 def load_all_datasets() -> List[Dict[str, Any]]:
-    """加载所有数据集（带缓存）"""
-    global _datasets_cache
+    """加载所有数据集（带缓存、过期和错误恢复）"""
+    global _datasets_cache, _cache_timestamp
+    
+    import time
+    current_time = time.time()
     
     with _cache_lock:
-        # 如果缓存存在，直接返回（避免重复扫描）
-        if _datasets_cache is not None:
+        # 检查缓存是否存在且未过期
+        if (_datasets_cache is not None and 
+            _cache_timestamp is not None and 
+            (current_time - _cache_timestamp) < CACHE_EXPIRE_SECONDS):
             return _datasets_cache
         
+        # 缓存已过期或不存在
         datasets = None
         
         # 尝试从索引文件加载
@@ -316,19 +359,47 @@ def load_all_datasets() -> List[Dict[str, Any]]:
             try:
                 with open(INDEX_FILE, "r", encoding="utf-8") as f:
                     datasets = json.load(f)
+                
+                # 验证数据格式
+                if not isinstance(datasets, list):
+                    print(f"索引文件格式错误，预期列表但得到 {type(datasets)}")
+                    datasets = None
+                else:
+                    print(f"从缓存加载 {len(datasets)} 个数据集")
+                    
+            except json.JSONDecodeError as e:
+                print(f"解析数据集索引文件失败: {e}，将重新扫描")
+                datasets = None
             except Exception as e:
                 print(f"读取数据集索引文件失败: {e}，将重新扫描")
+                datasets = None
         
         # 如果没有索引文件或读取失败，重建索引
         if datasets is None:
-            return rebuild_dataset_index()
-            
+            print("重建数据集索引...")
+            try:
+                datasets = rebuild_dataset_index()
+            except Exception as e:
+                print(f"重建索引失败: {e}")
+                _datasets_cache = []
+                return []
+        
         # 检查并修复缺失的 ID (兼容旧索引文件)
         needs_save = False
-        for dataset in datasets:
-            if dataset.get("id") is None:
-                dataset["id"] = generate_dataset_id(dataset.get("path", ""), dataset.get("config_name"))
-                needs_save = True
+        try:
+            for dataset in datasets:
+                if not isinstance(dataset, dict):
+                    print(f"跳过无效的数据集条目: {dataset}")
+                    continue
+                    
+                if dataset.get("id") is None:
+                    dataset["id"] = generate_dataset_id(
+                        dataset.get("path", ""), 
+                        dataset.get("config_name")
+                    )
+                    needs_save = True
+        except Exception as e:
+            print(f"修复数据集 ID 失败: {e}")
         
         # 如果有更新，保存回文件
         if needs_save:
@@ -340,6 +411,7 @@ def load_all_datasets() -> List[Dict[str, Any]]:
                 print(f"保存更新后的数据集索引失败: {e}")
         
         _datasets_cache = datasets
+        _cache_timestamp = current_time
         return datasets
 
 
@@ -393,57 +465,80 @@ async def list_datasets(
 @router.post("/refresh-cache")
 async def refresh_cache():
     """刷新数据集缓存（触发重新扫描并更新索引）"""
-    global _datasets_cache
-    with _cache_lock:
-        _datasets_cache = None
+    global _datasets_cache, _cache_timestamp
     
-    # 强制重新扫描并更新索引文件
     try:
-        rebuild_dataset_index()
-        return {"message": "缓存已刷新，数据集索引已更新"}
+        # 清除缓存
+        with _cache_lock:
+            _datasets_cache = None
+            _cache_timestamp = None
+        
+        # 异步重建索引，避免阻塞
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
+        # 使用超时保护，防止长时间阻塞
+        try:
+            datasets = await asyncio.wait_for(
+                loop.run_in_executor(None, rebuild_dataset_index),
+                timeout=30.0  # 30秒超时
+            )
+            return {
+                "message": f"缓存已刷新，数据集索引已更新。共找到 {len(datasets)} 个数据集",
+                "count": len(datasets)
+            }
+        except asyncio.TimeoutError:
+            return {
+                "message": "缓存刷新超时，但后台仍在继续处理。请稍后刷新页面查看结果。",
+                "warning": True
+            }
+            
     except Exception as e:
-        return {"message": f"缓存刷新失败: {str(e)}"}
+        import traceback
+        error_msg = f"缓存刷新失败: {str(e)}"
+        print(error_msg)
+        traceback.print_exc()
+        return {
+            "message": error_msg,
+            "error": True
+        }
 
 
 @router.get("/samples")
-async def get_dataset_samples(dataset_name: str = Query(..., description="数据集名称"), split: str = Query("train"), limit: int = Query(2)):
-    """获取数据集样本（带缓存）"""
-    # URL 解码数据集名称（处理可能的编码问题）
-    import urllib.parse
-    dataset_name = urllib.parse.unquote(dataset_name)
-    
-    cache_key = f"{dataset_name}:{split}"
-    
-    # 检查缓存
-    with _samples_cache_lock:
-        if cache_key in _samples_cache and len(_samples_cache[cache_key]) >= limit:
-            return _samples_cache[cache_key][:limit]
-    
-    # 从缓存的数据集列表中查找数据集信息
-    all_datasets = load_all_datasets()
-    dataset_info = None
-    
-    # 调试：打印所有数据集名称
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"查找数据集: {dataset_name}")
-    logger.info(f"可用数据集名称: {[d.get('name') for d in all_datasets[:10]]}")
-    
-    # 首先尝试精确匹配 name
-    for d in all_datasets:
-        if d.get("name") == dataset_name:
-            dataset_info = d
-            logger.info(f"精确匹配成功: {dataset_name} -> {d.get('name')}")
-            break
-    
-    # 如果找不到，尝试多种匹配方式
-    if not dataset_info:
-        # 将数据集名称中的斜杠转换为下划线，用于匹配目录名格式
-        dataset_name_normalized = dataset_name.replace("/", "_")
-        # 也尝试将下划线转换为斜杠
-        dataset_name_with_slash = dataset_name.replace("_", "/")
+async def get_dataset_samples(
+    dataset_name: str = Query(..., description="数据集名称"), 
+    split: str = Query("train"), 
+    limit: int = Query(2, le=100)  # 限制最大100条
+):
+    """获取数据集样本（带缓存和性能优化）"""
+    try:
+        # URL 解码数据集名称（处理可能的编码问题）
+        import urllib.parse
+        dataset_name = urllib.parse.unquote(dataset_name)
         
-        logger.info(f"尝试模糊匹配: {dataset_name} -> {dataset_name_normalized} 或 {dataset_name_with_slash}")
+        cache_key = f"{dataset_name}:{split}"
+        
+        # 检查缓存
+        with _samples_cache_lock:
+            if cache_key in _samples_cache and len(_samples_cache[cache_key]) >= limit:
+                return _samples_cache[cache_key][:limit]
+        
+        # 从缓存的数据集列表中查找数据集信息
+        all_datasets = load_all_datasets()
+        dataset_info = None
+        
+        # 首先尝试精确匹配 name
+        for d in all_datasets:
+            if d.get("name") == dataset_name:
+                dataset_info = d
+                break
+        
+        # 如果找不到，尝试多种匹配方式
+        if not dataset_info:
+            # 将数据集名称中的斜杠转换为下划线，用于匹配目录名格式
+            dataset_name_normalized = dataset_name.replace("/", "_")
+            # 也尝试将下划线转换为斜杠
+            dataset_name_with_slash = dataset_name.replace("_", "/")
         
         # 尝试解析数据集名称，可能是 path/config_name 格式
         # 例如: EleutherAI/hendrycks/math_intermediate_algebra
@@ -526,126 +621,93 @@ async def get_dataset_samples(dataset_name: str = Query(..., description="数据
             
             if matches:
                 dataset_info = d
-                logger.info(f"模糊匹配成功: {dataset_name} -> {name} (path: {path}, config: {config_name})")
                 break
-    
-    if not dataset_info:
-        # 提供更详细的错误信息，列出所有可用的数据集名称
-        available_names = [d.get("name", "unknown") for d in all_datasets[:20]]  # 显示前20个
-        # 也显示路径信息以便调试
-        available_info = [
-            f"{d.get('name', 'unknown')} (path: {d.get('path', 'unknown')}, config: {d.get('config_name', 'None')})"
-            for d in all_datasets[:20]
-        ]
-        # 尝试查找包含相似路径的数据集
-        similar_datasets = [
-            d for d in all_datasets 
-            if (dataset_name.replace("/", "_") in d.get("name", "") or 
-                dataset_name.replace("_", "/") in d.get("name", "") or
-                dataset_name in d.get("path", "") or
-                dataset_name.replace("/", "_") in d.get("path", ""))
-        ]
-        similar_info = [
-            f"{d.get('name', 'unknown')} (path: {d.get('path', 'unknown')})"
-            for d in similar_datasets[:10]
-        ]
         
-        error_msg = f"数据集不存在: {dataset_name}"
-        if similar_info:
-            error_msg += f"。相似数据集: {'; '.join(similar_info)}"
-        error_msg += f"。可用数据集（前10个）: {', '.join(available_names[:10])}"
-        
-        logger.error(f"数据集查找失败: {dataset_name}")
-        logger.error(f"所有可用数据集: {available_info[:10]}")
-        
-        raise HTTPException(
-            status_code=404, 
-            detail=error_msg
-        )
-    
-    # 检查是否有本地路径
-    local_path = dataset_info.get("local_path")
-    if not local_path:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"数据集 '{dataset_name}' 没有本地路径，无法加载样本。请先下载数据集。"
-        )
-    
-    # 检查本地路径是否存在
-    from pathlib import Path
-    local_path_obj = Path(local_path)
-    if not local_path_obj.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"数据集本地路径不存在: {local_path}"
-        )
-    
-    # 从本地加载数据集
-    # load_from_disk 可以正确读取 Arrow 格式的数据集（data-00000-of-00001.arrow 等文件）
-    try:
-        # 确保路径是字符串格式
-        dataset_path_str = str(local_path)
-        
-        # 使用 load_from_disk 加载数据集
-        # 这会自动读取目录下的所有 splits（test/, train/, validation/ 等）
-        # 以及对应的 Arrow 文件（data-00000-of-00001.arrow 等）
-        dataset = load_from_disk(dataset_path_str)
-        
-        # 验证数据集是否成功加载
-        if not dataset or not isinstance(dataset, dict):
-            raise ValueError(f"数据集加载失败：返回的数据不是字典格式")
+        if not dataset_info:
+            # 提供简洁的错误信息，避免过多输出
+            available_names = [d.get("name", "unknown") for d in all_datasets[:10]]
+            error_msg = f"数据集不存在: {dataset_name}。可用数据集（前10个）: {', '.join(available_names)}"
             
-    except Exception as e:
-        import traceback
-        error_detail = f"加载本地数据集失败: {str(e)}。路径: {local_path}"
-        # 在开发环境中，可以包含更详细的错误信息
-        if os.environ.get("DEBUG", "").lower() == "true":
-            error_detail += f"\n详细错误: {traceback.format_exc()}"
-        raise HTTPException(
-            status_code=500, 
-            detail=error_detail
-        )
-    
-    # 检查 split 是否存在
-    if split not in dataset:
-        available_splits = list(dataset.keys())
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Split '{split}' 不存在。可用 splits: {', '.join(available_splits)}"
-        )
-    
-    # 获取样本
-    # dataset[split] 返回的是 Dataset 对象，可以通过切片获取样本
-    try:
-        split_dataset = dataset[split]
+            raise HTTPException(
+                status_code=404, 
+                detail=error_msg
+            )
         
-        # 获取指定数量的样本
-        # 使用 [:limit] 切片，这会返回 Dataset 对象的前 limit 条记录
-        samples = split_dataset[:limit]
+        # 检查是否有本地路径
+        local_path = dataset_info.get("local_path")
+        if not local_path:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"数据集 '{dataset_name}' 没有本地路径，无法加载样本。请先下载数据集。"
+            )
         
-        # 转换为字典列表
-        # 如果 samples 是字典（单个样本），转换为列表
-        if isinstance(samples, dict):
-            sample_list = [samples]
-        else:
-            # samples 是 Dataset 对象，转换为字典列表
-            sample_list = [dict(sample) for sample in samples]
+        # 检查本地路径是否存在
+        from pathlib import Path
+        local_path_obj = Path(local_path)
+        if not local_path_obj.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"数据集本地路径不存在: {local_path}"
+            )
+        
+        # 从本地加载数据集（使用超时保护）
+        try:
+            dataset_path_str = str(local_path)
+            dataset = load_from_disk(dataset_path_str)
             
+            # 验证数据集是否成功加载
+            if not dataset or not isinstance(dataset, dict):
+                raise ValueError(f"数据集加载失败：返回的数据不是字典格式")
+                
+        except Exception as e:
+            error_detail = f"加载本地数据集失败: {str(e)}"
+            raise HTTPException(status_code=500, detail=error_detail)
+        
+        # 检查 split 是否存在
+        if split not in dataset:
+            available_splits = list(dataset.keys())
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Split '{split}' 不存在。可用 splits: {', '.join(available_splits)}"
+            )
+        
+        # 获取样本
+        try:
+            split_dataset = dataset[split]
+            samples = split_dataset[:limit]
+            
+            # 转换为字典列表
+            if isinstance(samples, dict):
+                # 单个样本
+                sample_list = [{k: v[i] for k, v in samples.items()} for i in range(len(next(iter(samples.values()))))]
+            else:
+                sample_list = [dict(sample) for sample in samples]
+                
+        except Exception as e:
+            error_detail = f"读取样本失败: {str(e)}"
+            raise HTTPException(status_code=500, detail=error_detail)
+        
+        # 更新缓存（带大小限制）
+        with _samples_cache_lock:
+            # 如果缓存已满，删除最旧的条目
+            if len(_samples_cache) >= MAX_SAMPLES_CACHE_SIZE:
+                # 删除第一个（最旧的）条目
+                first_key = next(iter(_samples_cache))
+                del _samples_cache[first_key]
+            
+            _samples_cache[cache_key] = sample_list
+        
+        return sample_list
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        # 捕获所有未预期的异常
         import traceback
-        error_detail = f"读取样本失败: {str(e)}"
-        if os.environ.get("DEBUG", "").lower() == "true":
-            error_detail += f"\n详细错误: {traceback.format_exc()}"
-        raise HTTPException(
-            status_code=500,
-            detail=error_detail
-        )
-    
-    # 更新缓存
-    with _samples_cache_lock:
-        _samples_cache[cache_key] = sample_list
-    
-    return sample_list
+        error_detail = f"获取数据集样本时发生错误: {str(e)}"
+        print(error_detail)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @router.get("/{dataset_id}", response_model=DatasetResponse)

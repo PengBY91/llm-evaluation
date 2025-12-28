@@ -269,11 +269,17 @@ const taskForm = ref({
 })
 
 const loadTasks = async () => {
+  if (loading.value) {
+    // 防止重复加载
+    return
+  }
+  
   loading.value = true
   try {
     tasks.value = await tasksApi.getTasks()
   } catch (error) {
-    ElMessage.error('加载任务列表失败: ' + error.message)
+    console.error('加载任务列表失败:', error)
+    ElMessage.error('加载任务列表失败: ' + (error.message || '未知错误'))
   } finally {
     loading.value = false
   }
@@ -284,6 +290,7 @@ const loadModels = async () => {
     models.value = await modelsApi.getModels()
   } catch (error) {
     console.error('加载模型列表失败:', error)
+    // 不显示错误消息，因为这不是关键操作
   }
 }
 
@@ -688,6 +695,11 @@ const formatErrorMessage = (errorMessage) => {
 }
 
 const loadAvailableTasks = async () => {
+  // 防止重复加载
+  if (loadingAvailableTasks.value) {
+    return
+  }
+  
   // 如果已经加载过，直接返回
   if (availableTasks.value.length > 0) {
     return

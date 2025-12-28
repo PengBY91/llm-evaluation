@@ -180,6 +180,11 @@ const datasetForm = ref({
 
 
 const loadDatasets = async () => {
+  if (loading.value) {
+    // 防止重复加载
+    return
+  }
+  
   loading.value = true
   try {
     const params = {
@@ -207,7 +212,8 @@ const loadDatasets = async () => {
     total.value = response.total || 0
     categories.value = response.categories || []
   } catch (error) {
-    ElMessage.error('加载数据集列表失败: ' + error.message)
+    console.error('加载数据集列表失败:', error)
+    ElMessage.error('加载数据集列表失败: ' + (error.message || '未知错误'))
   } finally {
     loading.value = false
   }
@@ -235,13 +241,29 @@ const handleSizeChange = (size) => {
 }
 
 const refreshCache = async () => {
+  if (refreshing.value) {
+    ElMessage.warning('正在刷新中，请稍候')
+    return
+  }
+  
   refreshing.value = true
   try {
-    await datasetsApi.refreshCache()
-    ElMessage.success('缓存已刷新')
-    loadDatasets()
+    const result = await datasetsApi.refreshCache()
+    
+    if (result.warning) {
+      ElMessage.warning(result.message)
+    } else if (result.error) {
+      ElMessage.error(result.message)
+    } else {
+      ElMessage.success(result.message || '缓存已刷新')
+    }
+    
+    // 延迟加载数据集列表，给后端时间完成索引
+    setTimeout(() => {
+      loadDatasets()
+    }, 500)
   } catch (error) {
-    ElMessage.error('刷新缓存失败: ' + error.message)
+    ElMessage.error('刷新缓存失败: ' + (error.message || '未知错误'))
   } finally {
     refreshing.value = false
   }

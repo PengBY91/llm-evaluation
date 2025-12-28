@@ -2,12 +2,16 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000
+  timeout: 60000  // 增加到 60 秒，对于大型数据集操作可能需要更长时间
 })
 
 // 请求拦截器
 api.interceptors.request.use(
   config => {
+    // 对于刷新缓存等耗时操作，使用更长的超时时间
+    if (config.url && config.url.includes('refresh-cache')) {
+      config.timeout = 120000  // 120 秒
+    }
     return config
   },
   error => {
@@ -22,11 +26,22 @@ api.interceptors.response.use(
   },
   error => {
     // 改进错误处理，保留完整的错误信息
+    if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+      // 超时错误
+      const timeoutError = new Error('请求超时，操作可能仍在后台继续。请稍后刷新页面查看结果。')
+      timeoutError.isTimeout = true
+      return Promise.reject(timeoutError)
+    }
+    
     if (error.response) {
       // 服务器返回了错误响应
       const data = error.response.data
       // 保留完整的错误对象，让调用方可以访问 detail 等信息
-      const errorObj = new Error(data?.message || data?.detail || `请求失败: ${error.response.status} ${error.response.statusText}`)
+      const errorObj = new Error(
+        data?.message || 
+        data?.detail || 
+        `请求失败: ${error.response.status} ${error.response.statusText}`
+      )
       errorObj.response = error.response
       errorObj.detail = data?.detail || data
       errorObj.status = error.response.status
