@@ -226,7 +226,7 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
             top_level_dirs = [d for d in DATA_DIR.iterdir() 
                              if d.is_dir() 
                              and not d.name.startswith('.') 
-                             and d.name not in ['datasets_metadata', 'tasks']]
+                             and d.name not in ['datasets_metadata', 'tasks', 'tokenizers']]
         except Exception as e:
             print(f"读取数据目录失败: {e}")
             _datasets_cache = []

@@ -31,7 +31,7 @@ def get_task_manager():
     return _task_manager
 
 # 存储任务状态（使用文件持久化）
-TASKS_DIR = Path(__file__).parent.parent.parent / "data" / "tasks"
+TASKS_DIR = Path(__file__).parent.parent.parent / "tasks"
 TASKS_DIR.mkdir(parents=True, exist_ok=True)
 
 tasks_db: Dict[str, Dict[str, Any]] = {}
@@ -40,6 +40,86 @@ tasks_lock = threading.Lock()
 # 结果存储目录
 RESULTS_DIR = Path(__file__).parent.parent.parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
+
+
+def patch_tokenizer():
+    """解决部分 lm-eval 版本中对 transformers 分词器调用不存在的 encode_batch 方法的 Bug"""
+    try:
+        from transformers import PreTrainedTokenizerFast
+        if not hasattr(PreTrainedTokenizerFast, 'encode_batch'):
+            def encode_batch(self, texts, **kwargs):
+                # 转换输入确保是列表
+                if not isinstance(texts, (list, tuple)):
+                    try:
+                        texts = list(texts)
+                    except:
+                        pass
+                
+                # 核心修复：确保所有元素都是字符串 (处理 JsonChatStr 等对象)
+                texts = [str(t) for t in texts]
+                
+                # 使用单独的 encode 调用，直接返回 token IDs 列表
+                result = []
+                for text in texts:
+                    ids = self.encode(text, **kwargs)
+                    result.append(ids)
+                return result
+            
+            PreTrainedTokenizerFast.encode_batch = encode_batch
+            print("[DEBUG] 已成功为 PreTrainedTokenizerFast 补全 encode_batch 方法 (返回原始 token IDs)")
+    except Exception as e:
+        print(f"[DEBUG] 分词器补丁跳过或失败: {e}")
+
+# 执行补丁
+patch_tokenizer()
+
+
+def patch_aiohttp_proxy():
+    """强制 lm-eval 的 aiohttp 客户端使用系统代理"""
+    try:
+        # 检查是否有代理配置
+        http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+        https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+        proxy_url = https_proxy or http_proxy
+        
+        if not proxy_url:
+            return
+        
+        print(f"[DEBUG] 正在为 aiohttp 配置代理: {proxy_url}")
+        
+        # 导入 aiohttp 并 patch ClientSession
+        import aiohttp
+        original_init = aiohttp.ClientSession.__init__
+        
+        def patched_init(self, *args, **kwargs):
+            # 如果没有显式设置 connector，添加代理支持
+            if 'connector' not in kwargs:
+                # 创建支持代理的 connector
+                connector = aiohttp.TCPConnector(
+                    ssl=False,  # 禁用 SSL 验证以避免代理问题
+                    force_close=True
+                )
+                kwargs['connector'] = connector
+            
+            # 设置信任环境变量中的代理
+            if 'trust_env' not in kwargs:
+                kwargs['trust_env'] = True
+            
+            # 增加超时时间
+            if 'timeout' not in kwargs:
+                timeout = aiohttp.ClientTimeout(total=180, connect=60, sock_read=60)
+                kwargs['timeout'] = timeout
+            
+            return original_init(self, *args, **kwargs)
+        
+        aiohttp.ClientSession.__init__ = patched_init
+        print("[DEBUG] 已成功为 aiohttp.ClientSession 配置代理支持 (trust_env=True)")
+        
+    except Exception as e:
+        print(f"[DEBUG] aiohttp 代理补丁失败: {e}")
+
+# 执行代理补丁
+patch_aiohttp_proxy()
 
 
 def save_task_to_file(task_id: str, task_data: Dict[str, Any]):
@@ -220,19 +300,26 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
         # 针对 API 模型自动优化并发参数
         if request.model in ["openai-chat-completions", "openai-completions"]:
             # 如果没有显式设置 num_concurrent，则设置默认值以提高并发性能
-            # 默认值设为 20，这对于大多数 API 提供商（OpenAI, DeepSeek, vLLM 等）都是安全的起始值
+            # 默认值设为 100，这对于大多数现代 API 提供商（OpenAI, DeepSeek, vLLM 等）都是理想的并发值
             if "num_concurrent" not in request.model_args:
-                # 检查是否在 request 顶层设置了 (虽然目前 API 定义里没有这个字段，但为了健壮性)
-                # 注意：TaskCreateRequest 定义里没有 max_concurrent/num_concurrent，只有 model_args 里有
-                default_concurrent = 20
+                default_concurrent = 100
                 request.model_args["num_concurrent"] = default_concurrent
                 print(f"[INFO] 自动优化: 为 API 模型设置 num_concurrent={default_concurrent}")
-
-            # 确保 batch_size 设置合理
-            # 对于 API 模型，batch_size='auto' 可能导致尝试探测最大 batch size，这对于 API 来说通常没有意义且耗时
-            # 如果用户没有指定 batch_size，我们显式设置为 1 (或者是 'auto'，取决于 lm_eval 版本对 API 模型的处理)
-            # lm-eval 对 API 模型的 batch_size 处理：通常建议设为 1 或 'auto'
-            # 如果未设置，保持默认（通常是 1）
+            
+            # 配置代理支持：确保 aiohttp 能够使用系统代理
+            # 检查环境变量中是否有代理配置
+            http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+            https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+            
+            if https_proxy or http_proxy:
+                proxy_url = https_proxy or http_proxy
+                print(f"[INFO] 检测到代理配置: {proxy_url}")
+                # 将代理信息传递给 model_args，lm-eval 的某些版本支持这个参数
+                # 注意：这取决于 lm-eval 的版本，如果不支持，我们需要通过环境变量传递
+                if "aiohttp_client_timeout" not in request.model_args:
+                    # 增加超时时间以适应代理环境
+                    request.model_args["aiohttp_client_timeout"] = 120
+                    print(f"[INFO] 设置 aiohttp 超时为 120 秒以适应代理环境")
         
         print(f"[DEBUG] 评测参数 - model: {request.model}, base_url: {request.model_args.get('base_url')}, model_args keys: {list(request.model_args.keys()) if request.model_args else None}")
         

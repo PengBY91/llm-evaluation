@@ -11,6 +11,7 @@ env/
 
 models/
 results/
+tasks/
 
 
 web_frontend/node_modules/

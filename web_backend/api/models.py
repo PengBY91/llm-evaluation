@@ -154,38 +154,37 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
         # 观察用户报错：Invalid URL (POST /v1) - 这表明请求发往了 /v1 而不是完整的 URL
         # 这通常意味着 base_url 解析有问题，或者 lm-eval 期望 base_url 不包含路径
         
-        # 让我们检查一下 urlparse 的行为
+        # 智能处理 base_url：检查是否已包含完整的端点路径
+        # 如果没有，根据模型类型自动补全
         from urllib.parse import urlparse
         parsed = urlparse(base_url)
         
-        # 如果 base_url 已经是完整的 API 端点（例如 https://api.deepseek.com/chat/completions），
-        # 某些客户端可能会再次追加路径。
-        # 但通常 base_url 应该是 https://api.deepseek.com/v1 或 https://api.deepseek.com
+        # 判断是否已经包含完整的端点路径
+        has_chat_completions = parsed.path.endswith('/chat/completions')
+        has_completions = parsed.path.endswith('/completions') and not has_chat_completions
         
-        # 针对 DeepSeek 的官方文档，base_url 是 https://api.deepseek.com
-        # 如果用户填写的是 https://api.deepseek.com，我们可能不需要自动添加 /v1/chat/completions
-        # 或者我们需要添加 /v1，变成 https://api.deepseek.com/v1
+        if model_type == "openai-chat-completions" and not has_chat_completions:
+            # 需要添加 /chat/completions
+            if parsed.path.endswith('/v1'):
+                base_url = base_url + '/chat/completions'
+            elif parsed.path and parsed.path != '/':
+                # 如果有其他路径（如 /api, /v2），在末尾追加
+                base_url = base_url.rstrip('/') + '/chat/completions'
+            else:
+                # 没有路径或只有 /，添加完整路径
+                base_url = base_url.rstrip('/') + '/v1/chat/completions'
+                
+        elif model_type == "openai-completions" and not has_completions:
+            # 需要添加 /completions
+            if parsed.path.endswith('/v1'):
+                base_url = base_url + '/completions'
+            elif parsed.path and parsed.path != '/':
+                # 如果有其他路径，在末尾追加
+                base_url = base_url.rstrip('/') + '/completions'
+            else:
+                # 没有路径或只有 /，添加完整路径
+                base_url = base_url.rstrip('/') + '/v1/completions'
         
-        # 如果 base_url 不包含路径，根据模型类型自动添加默认路径
-        if not parsed.path or parsed.path == "/":
-            # 根据模型类型添加默认路径
-            if model_type == "openai-chat-completions":
-                # 对于 chat completions 模型，添加 /v1/chat/completions
-                if base_url.endswith("/"):
-                    base_url = base_url.rstrip("/") + "/v1/chat/completions"
-                else:
-                    base_url = base_url + "/v1/chat/completions"
-            elif model_type == "openai-completions":
-                # 对于 completions 模型，如果用户没有提供路径，添加 /v1/completions
-                # 但如果用户已经提供了包含 /v1/completions 的完整 URL（在前端提示中是这样），则不重复添加
-                # 这里只处理纯域名的情况
-                if base_url.endswith("/"):
-                    base_url = base_url.rstrip("/") + "/v1/completions"
-                else:
-                    base_url = base_url + "/v1/completions"
-        
-        # 移除自动添加逻辑，因为前端现在提示用户输入完整 URL
-        # 如果 base_url 已经是完整的（包含 /v1/completions），则直接使用
         model_args["base_url"] = base_url
     
     if model.get("max_concurrent"):
@@ -200,6 +199,30 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
     # 合并其他配置
     if model.get("other_config"):
         model_args.update(model["other_config"])
+    
+    # --- 核心修复：自动处理 Tokenizer 映射 ---
+    # 如果用户没有显式提供 tokenizer，针对已知模型或模型类型提供默认值
+    if "tokenizer" not in model_args:
+        model_name = model.get("model_name", "").lower()
+        
+        # 定义本地分词器路径
+        local_tokenizer_path = Path(__file__).parent.parent.parent / "tokenizers" / "gpt-4"
+        tokenizer_val = "gpt-4"
+        if local_tokenizer_path.exists():
+            tokenizer_val = str(local_tokenizer_path.absolute())
+            print(f"[DEBUG] 使用本地分词器路径: {tokenizer_val}")
+        
+        # 针对 DeepSeek 模型
+        if "deepseek" in model_name:
+            model_args["tokenizer"] = tokenizer_val
+            print(f"[INFO] 自动为 DeepSeek 模型 '{model_name}' 设置 tokenizer='{tokenizer_val}'")
+            
+        # 对于所有 OpenAI 兼容接口，如果模型名不被识别
+        elif model_type in ["openai-chat-completions", "openai-completions"]:
+            standard_openai_models = ["gpt-3.5", "gpt-4", "text-davinci", "gpt-o1", "gpt-4o"]
+            if not any(std in model_name for std in standard_openai_models):
+                model_args["tokenizer"] = tokenizer_val
+                print(f"[INFO] 自动为 OpenAI 兼容模型 '{model_name}' 设置 tokenizer='{tokenizer_val}'")
         
     return model_args
 

@@ -48,18 +48,24 @@
         <el-form-item label="模型名称" prop="name" required>
           <el-input v-model="modelForm.name" placeholder="请输入模型名称" />
         </el-form-item>
-        <el-form-item label="模型类型" prop="model_type" required v-show="false">
+        <el-form-item label="模型类型" prop="model_type" required>
           <el-select 
             v-model="modelForm.model_type" 
             placeholder="请选择模型类型"
             style="width: 100%"
+            @change="handleModelTypeChange"
           >
             <el-option 
               v-for="type in modelTypes" 
               :key="type.value" 
               :label="type.label" 
               :value="type.value"
-            />
+            >
+              <div>
+                <div>{{ type.label }}</div>
+                <div style="font-size: 12px; color: #999;">{{ type.description }}</div>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="模型标识" prop="model_name" :required="needsModelName">
