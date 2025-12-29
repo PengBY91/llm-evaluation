@@ -320,7 +320,6 @@ const loadSamples = async () => {
 const refreshDataset = async () => {
   loading.value = true
   try {
-    await datasetsApi.refreshCache()
     await loadDatasetDetail()
     ElMessage.success('详情已刷新')
   } catch (error) {

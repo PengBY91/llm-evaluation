@@ -1,50 +1,40 @@
 <template>
   <div class="datasets-view">
     <div class="view-header">
-      <div class="header-title">
-        <h2>数据集管理</h2>
-        <span class="header-subtitle">管理本地和云端评测数据集</span>
+      <div class="header-content">
+        <div class="header-title">
+          <h2>数据集管理</h2>
+          <span class="header-subtitle">管理本地和云端评测数据集</span>
+        </div>
+        
+        <div class="header-stats">
+          <div class="header-stat-item">
+            <div class="stat-item-value">{{ total }}</div>
+            <div class="stat-item-label">总数据集</div>
+          </div>
+          <div class="stat-item-divider"></div>
+          <div class="header-stat-item">
+            <div class="stat-item-value category">{{ categories.length }}</div>
+            <div class="stat-item-label">数据类别</div>
+          </div>
+          <div class="stat-item-divider"></div>
+          <div class="header-stat-item">
+            <div class="stat-item-value local">{{ datasets.filter(d => d.is_local).length }}</div>
+            <div class="stat-item-label">本地已下载</div>
+          </div>
+        </div>
       </div>
+
       <div class="header-actions">
-        <el-button @click="refreshCache" :loading="refreshing" class="action-btn">
+        <el-button @click="rebuildIndex" :loading="refreshing" class="action-btn">
           <el-icon><Refresh /></el-icon>
-          刷新缓存
+          重建索引
         </el-button>
         <el-button type="primary" @click="showAddDialog = true" class="action-btn">
           <el-icon><Plus /></el-icon>
           添加数据集
         </el-button>
       </div>
-    </div>
-
-    <!-- 统计信息 -->
-    <div class="statistics-row">
-      <el-row :gutter="20">
-        <el-col :span="8">
-          <el-card shadow="hover" class="stat-card">
-            <template #footer>
-              <div class="stat-label">总数据集</div>
-            </template>
-            <div class="stat-value">{{ total }}</div>
-          </el-card>
-        </el-col>
-        <el-col :span="8">
-          <el-card shadow="hover" class="stat-card category">
-            <template #footer>
-              <div class="stat-label">数据类别</div>
-            </template>
-            <div class="stat-value">{{ categories.length }}</div>
-          </el-card>
-        </el-col>
-        <el-col :span="8">
-          <el-card shadow="hover" class="stat-card local">
-            <template #footer>
-              <div class="stat-label">本地已下载</div>
-            </template>
-            <div class="stat-value">{{ datasets.filter(d => d.is_local).length }}</div>
-          </el-card>
-        </el-col>
-      </el-row>
     </div>
 
     <!-- 过滤和搜索 -->
@@ -275,29 +265,27 @@ const handleSizeChange = (size) => {
   loadDatasets()
 }
 
-const refreshCache = async () => {
+const rebuildIndex = async () => {
   if (refreshing.value) {
-    ElMessage.warning('正在刷新中，请稍候')
+    ElMessage.warning('正在重建中，请稍候')
     return
   }
   
   refreshing.value = true
   try {
-    const result = await datasetsApi.refreshCache()
+    const result = await datasetsApi.rebuildIndex()
+    ElMessage.success(result.message || '索引重建任务已启动')
     
-    if (result.warning) {
-      ElMessage.warning(result.message)
-    } else if (result.error) {
-      ElMessage.error(result.message)
-    } else {
-      ElMessage.success(result.message || '缓存已刷新')
-    }
+    // 因为是异步的，我们稍等一下再刷新列表，并再次调用 loadDatasets
+    setTimeout(() => {
+      loadDatasets()
+    }, 2000)
     
     setTimeout(() => {
       loadDatasets()
-    }, 500)
+    }, 5000)
   } catch (error) {
-    ElMessage.error('刷新缓存失败: ' + (error.message || '未知错误'))
+    ElMessage.error('重建索引失败: ' + (error.message || '未知错误'))
   } finally {
     refreshing.value = false
   }
@@ -361,12 +349,18 @@ onMounted(() => {
 .view-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   margin-bottom: 24px;
   background: white;
-  padding: 24px;
+  padding: 24px 32px;
   border-radius: 12px;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 48px;
 }
 
 .header-title h2 {
@@ -383,41 +377,46 @@ onMounted(() => {
   display: block;
 }
 
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 4px 0;
+}
+
+.header-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.stat-item-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #303133;
+  line-height: 1.2;
+}
+
+.stat-item-value.category { color: #409eff; }
+.stat-item-value.local { color: #67c23a; }
+
+.stat-item-label {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.stat-item-divider {
+  width: 1px;
+  height: 24px;
+  background-color: #ebeef5;
+}
+
 .action-btn {
   border-radius: 8px;
   padding: 10px 16px;
 }
-
-/* 统计卡片 */
-.statistics-row {
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  text-align: center;
-  border-radius: 12px;
-  border: none;
-  transition: transform 0.3s;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #909399;
-}
-
-.stat-card.category .stat-value { color: #409eff; }
-.stat-card.local .stat-value { color: #67c23a; }
 
 /* 过滤器 */
 .filters-container {

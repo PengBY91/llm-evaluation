@@ -2,7 +2,7 @@
 数据集管理 API
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -262,13 +262,13 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
                     # 跳过非数据集目录
                     continue
                 
-                # 延迟加载 TaskManager
+                # 使用共享的 get_task_manager (由 tasks 模块提供)
                 if task_manager is None:
                     try:
-                        from lm_eval.tasks import TaskManager
-                        task_manager = TaskManager()
+                        from api.tasks import get_task_manager
+                        task_manager = get_task_manager()
                     except Exception as e:
-                        print(f"初始化 TaskManager 失败: {e}")
+                        print(f"[DEBUG] 引入或初始化 get_task_manager 失败: {e}")
                 
                 # 创建父目录条目（对于有子数据集的情况，这代表整个任务组）
                 is_group = len(sub_datasets) > 0
@@ -289,25 +289,47 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
                     "subtasks": [sub.name for sub in sub_datasets] if sub_datasets else None
                 }
                 
-                # 如果是直接数据集，尝试加载 split 信息
-                if is_direct_dataset:
+                # 记录是否已从元数据中获取到 split 信息
+                has_splits = False
+                if dataset_name in saved_metadata:
+                    saved_meta = saved_metadata[dataset_name]
+                    # 如果元数据中有 split 信息，且不为空，则使用它
+                    if saved_meta.get("splits") and len(saved_meta.get("splits")) > 0 and saved_meta.get("num_examples"):
+                        parent_info["splits"] = saved_meta["splits"]
+                        parent_info["num_examples"] = saved_meta["num_examples"]
+                        has_splits = True
+                
+                # 如果是直接数据集，且没有 split 信息，尝试加载
+                if is_direct_dataset and not has_splits:
                     try:
+                        print(f"[DEBUG] Loading dataset splits for: {dataset_name}")
                         dataset = load_from_disk(str(dir_path))
                         splits = list(dataset.keys())
                         parent_info["splits"] = splits
                         parent_info["num_examples"] = {split: len(dataset[split]) for split in splits}
+                        # 保存到元数据
+                        save_dataset_metadata(dataset_name, None, {
+                            "splits": splits,
+                            "num_examples": parent_info["num_examples"]
+                        })
                     except Exception as e:
                         print(f"扫描数据集 {dataset_name} 的 splits 失败: {e}")
-                elif is_group and sub_datasets:
+                elif is_group and sub_datasets and not has_splits:
                     # 如果是组，且自己没有 splits，尝试从第一个子任务获取 splits 以供预览
                     try:
                         first_sub = sub_datasets[0]
+                        print(f"[DEBUG] Loading group preview splits from subtask: {dataset_name}/{first_sub.name}")
                         dataset = load_from_disk(str(first_sub))
                         splits = list(dataset.keys())
                         parent_info["splits"] = splits
                         parent_info["num_examples"] = {split: len(dataset[split]) for split in splits}
+                        # 保存到元数据
+                        save_dataset_metadata(dataset_name, None, {
+                            "splits": splits,
+                            "num_examples": parent_info["num_examples"]
+                        })
                     except Exception as e:
-                        print(f"扫描数据集组 {dataset_name} 的第一个子任务 splits 失败: {e}")
+                        print(f"扫描数据集组 {dataset_name} 的第 subtasks 失败: {e}")
                 
                 # 验证任务名称
                 if task_manager is not None:
@@ -371,6 +393,7 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
 
 def load_all_datasets() -> List[Dict[str, Any]]:
     """加载所有数据集（带缓存、过期和错误恢复）"""
+    print("[DEBUG] load_all_datasets called")
     global _datasets_cache, _cache_timestamp
     
     import time
@@ -383,68 +406,56 @@ def load_all_datasets() -> List[Dict[str, Any]]:
             (current_time - _cache_timestamp) < CACHE_EXPIRE_SECONDS):
             return _datasets_cache
         
-        # 缓存已过期或不存在
-        datasets = None
-        
         # 尝试从索引文件加载
         if INDEX_FILE.exists():
             try:
                 with open(INDEX_FILE, "r", encoding="utf-8") as f:
                     datasets = json.load(f)
                 
-                # 验证数据格式
-                if not isinstance(datasets, list):
-                    print(f"索引文件格式错误，预期列表但得到 {type(datasets)}")
-                    datasets = None
-                else:
+                if isinstance(datasets, list):
                     print(f"从缓存加载 {len(datasets)} 个数据集")
-                    
-            except json.JSONDecodeError as e:
-                print(f"解析数据集索引文件失败: {e}，将重新扫描")
-                datasets = None
+                    _datasets_cache = datasets
+                    _cache_timestamp = current_time
+                    return datasets
             except Exception as e:
-                print(f"读取数据集索引文件失败: {e}，将重新扫描")
-                datasets = None
-        
-        # 如果没有索引文件或读取失败，重建索引
-        if datasets is None:
-            print("重建数据集索引...")
-            try:
-                datasets = rebuild_dataset_index()
-            except Exception as e:
-                print(f"重建索引失败: {e}")
-                _datasets_cache = []
-                return []
-        
-        # 检查并修复缺失的 ID (兼容旧索引文件)
-        needs_save = False
-        try:
-            for dataset in datasets:
-                if not isinstance(dataset, dict):
-                    print(f"跳过无效的数据集条目: {dataset}")
-                    continue
-                    
-                if dataset.get("id") is None:
-                    dataset["id"] = generate_dataset_id(
-                        dataset.get("path", ""), 
-                        dataset.get("config_name")
-                    )
-                    needs_save = True
-        except Exception as e:
-            print(f"修复数据集 ID 失败: {e}")
-        
-        # 如果有更新，保存回文件
-        if needs_save:
-            try:
-                with open(INDEX_FILE, "w", encoding="utf-8") as f:
-                    json.dump(datasets, f, ensure_ascii=False, indent=2)
-                print(f"数据集索引已更新并保存到: {INDEX_FILE}")
-            except Exception as e:
-                print(f"保存更新后的数据集索引失败: {e}")
-        
+                print(f"加载索引文件失败: {e}")
+
+    # 如果运行到这里，说明没有缓存或加载失败，需要重建
+    print("[DEBUG] Index missing or expired. Rebuilding index outside of lock...")
+    try:
+        datasets = rebuild_dataset_index()
+    except Exception as e:
+        print(f"重建索引失败: {e}")
+        datasets = []
+
+    with _cache_lock:
         _datasets_cache = datasets
         _cache_timestamp = current_time
         return datasets
+
+
+@router.post("/rebuild-index/")
+@router.post("/rebuild-index")
+async def rebuild_index(background_tasks: BackgroundTasks):
+    """手动重建数据集索引 (后台异步执行)"""
+    print("[DEBUG] POST /api/datasets/rebuild-index called (Asynchronous)")
+    
+    # 定义后台任务函数
+    def do_rebuild():
+        try:
+            print("[DEBUG] Background rebuild-index started")
+            rebuild_dataset_index()
+            print("[DEBUG] Background rebuild-index completed")
+        except Exception as e:
+            print(f"[DEBUG] Background rebuild-index failed: {e}")
+
+    # 将任务加入后台队列
+    background_tasks.add_task(do_rebuild)
+    
+    return {
+        "message": "数据集索引重建任务已在后台启动，请在几秒钟后刷新页面",
+        "status": "processing"
+    }
 
 
 @router.get("/", response_model=DatasetListResponse)
@@ -531,6 +542,7 @@ async def list_datasets(
     )
 
 
+@router.post("/refresh-cache/")
 @router.post("/refresh-cache")
 async def refresh_cache():
     """刷新数据集缓存（触发重新扫描并更新索引）"""
@@ -580,10 +592,19 @@ async def get_dataset_samples(
     limit: int = Query(2, le=100)  # 限制最大100条
 ):
     """获取数据集样本（带缓存和性能优化）"""
+    # 显式初始化变量，避免 UnboundLocalError
+    dataset_name_normalized = ""
+    dataset_name_with_slash = ""
+    dataset_info = None
+
     try:
-        # URL 解码数据集名称（处理可能的编码问题）
+        # URL 解码数据集名称
         import urllib.parse
         dataset_name = urllib.parse.unquote(dataset_name)
+        
+        # 标准化名称用于匹配
+        dataset_name_normalized = dataset_name.replace("/", "_")
+        dataset_name_with_slash = dataset_name.replace("_", "/")
         
         cache_key = f"{dataset_name}:{split}"
         
@@ -594,189 +615,172 @@ async def get_dataset_samples(
         
         # 从缓存的数据集列表中查找数据集信息
         all_datasets = load_all_datasets()
-        dataset_info = None
         
-        # 首先尝试精确匹配 name
+        # 1. 尝试精确匹配 name
         for d in all_datasets:
             if d.get("name") == dataset_name:
                 dataset_info = d
                 break
         
-        # 如果找不到，尝试多种匹配方式
+        # 2. 如果找不到，进行模糊匹配
         if not dataset_info:
-            # 将数据集名称中的斜杠转换为下划线，用于匹配目录名格式
-            dataset_name_normalized = dataset_name.replace("/", "_")
-            # 也尝试将下划线转换为斜杠
-            dataset_name_with_slash = dataset_name.replace("_", "/")
-        
-        # 尝试解析数据集名称，可能是 path/config_name 格式
-        # 例如: EleutherAI/hendrycks/math_intermediate_algebra
-        # 可能是: path = EleutherAI/hendrycks/math, config_name = intermediate_algebra
-        # 或者: path = EleutherAI/hendrycks_math, config_name = intermediate_algebra
-        dataset_parts = dataset_name.split("/")
-        possible_paths = []
-        if len(dataset_parts) > 1:
-            # 尝试不同的路径组合
-            # 例如: EleutherAI/hendrycks/math_intermediate_algebra
-            # 可能是: EleutherAI/hendrycks/math + intermediate_algebra
-            # 或者: EleutherAI/hendrycks_math + intermediate_algebra
-            last_part = dataset_parts[-1]
-            if "_" in last_part:
-                # 最后一部分可能包含 config_name
-                parts = last_part.split("_", 1)
-                if len(parts) == 2:
-                    possible_paths.append(("/".join(dataset_parts[:-1]) + "/" + parts[0], parts[1]))
-                    possible_paths.append(("/".join(dataset_parts[:-1]) + "_" + parts[0], parts[1]))
-        
-        for d in all_datasets:
-            path = d.get("path", "")
-            config_name = d.get("config_name")
-            name = d.get("name", "")
+            # 尝试解析数据集名称，可能是 path/config_name 格式
+            dataset_parts = dataset_name.split("/")
+            possible_paths = []
+            if len(dataset_parts) > 1:
+                last_part = dataset_parts[-1]
+                if "_" in last_part:
+                    parts = last_part.split("_", 1)
+                    if len(parts) == 2:
+                        possible_paths.append(("/".join(dataset_parts[:-1]) + "/" + parts[0], parts[1]))
+                        possible_paths.append(("/".join(dataset_parts[:-1]) + "_" + parts[0], parts[1]))
             
-            # 尝试匹配 path_config_name 格式
-            if config_name:
-                expected_name = f"{path}_{config_name}"
-                # 也尝试路径中的斜杠替换为下划线的格式
-                path_normalized = path.replace("/", "_")
-                expected_name_normalized = f"{path_normalized}_{config_name}"
-            else:
-                expected_name = path
-                path_normalized = path.replace("/", "_")
-                expected_name_normalized = path_normalized
-            
-            # 多种匹配方式：支持斜杠和下划线的互相转换
-            matches = (
-                expected_name == dataset_name or 
-                expected_name_normalized == dataset_name or
-                expected_name_normalized == dataset_name_normalized or
-                expected_name == dataset_name_normalized or
-                expected_name == dataset_name_with_slash or
-                path == dataset_name or
-                path == dataset_name_normalized or
-                path == dataset_name_with_slash or
-                path_normalized == dataset_name or
-                path_normalized == dataset_name_normalized or
-                name == dataset_name or
-                name == dataset_name_normalized or
-                name == dataset_name_with_slash or
-                name.replace("/", "_") == dataset_name_normalized or
-                name.replace("_", "/") == dataset_name or
-                name.replace("_", "/") == dataset_name_with_slash
-            )
-            
-            # 检查可能的路径组合
-            if not matches and possible_paths:
-                for possible_path, possible_config in possible_paths:
-                    if path == possible_path and config_name == possible_config:
-                        matches = True
-                        break
-                    path_norm = possible_path.replace("/", "_")
-                    if path_normalized == path_norm and config_name == possible_config:
-                        matches = True
-                        break
-            
-            # 最后尝试：直接比较路径的各个部分（忽略分隔符）
-            if not matches:
-                # 将路径和名称都标准化（统一使用下划线）
-                dataset_name_std = dataset_name.replace("/", "_").replace("-", "_")
-                path_std = path.replace("/", "_").replace("-", "_")
-                name_std = name.replace("/", "_").replace("-", "_")
+            for d in all_datasets:
+                path = d.get("path", "")
+                config_name = d.get("config_name")
+                name = d.get("name", "")
                 
-                # 如果标准化后的名称或路径完全匹配
-                if (dataset_name_std == path_std or 
-                    dataset_name_std == name_std or
-                    (config_name and dataset_name_std == f"{path_std}_{config_name}")):
-                    matches = True
-            
-            if matches:
-                dataset_info = d
-                break
+                # 尝试匹配 path_config_name 格式
+                if config_name:
+                    expected_name = f"{path}_{config_name}"
+                    path_normalized = path.replace("/", "_")
+                    expected_name_normalized = f"{path_normalized}_{config_name}"
+                else:
+                    expected_name = path
+                    path_normalized = path.replace("/", "_")
+                    expected_name_normalized = path_normalized
+                
+                # 多种匹配方式
+                matches = (
+                    expected_name == dataset_name or 
+                    expected_name_normalized == dataset_name or
+                    expected_name_normalized == dataset_name_normalized or
+                    expected_name == dataset_name_normalized or
+                    expected_name == dataset_name_with_slash or
+                    path == dataset_name or
+                    path == dataset_name_normalized or
+                    path == dataset_name_with_slash or
+                    path_normalized == dataset_name or
+                    path_normalized == dataset_name_normalized or
+                    name == dataset_name or
+                    name == dataset_name_normalized or
+                    name == dataset_name_with_slash or
+                    name.replace("/", "_") == dataset_name_normalized or
+                    name.replace("_", "/") == dataset_name or
+                    name.replace("_", "/") == dataset_name_with_slash
+                )
+                
+                if not matches and possible_paths:
+                    for possible_path, possible_config in possible_paths:
+                        if path == possible_path and config_name == possible_config:
+                            matches = True
+                            break
+                        path_norm = possible_path.replace("/", "_")
+                        if path_normalized == path_norm and config_name == possible_config:
+                            matches = True
+                            break
+                
+                if not matches:
+                    dataset_name_std = dataset_name.replace("/", "_").replace("-", "_")
+                    path_std = path.replace("/", "_").replace("-", "_")
+                    name_std = name.replace("/", "_").replace("-", "_")
+                    if (dataset_name_std == path_std or 
+                        dataset_name_std == name_std or
+                        (config_name and dataset_name_std == f"{path_std}_{config_name}")):
+                        matches = True
+                
+                if matches:
+                    dataset_info = d
+                    break
         
         if not dataset_info:
-            # 提供简洁的错误信息，避免过多输出
             available_names = [d.get("name", "unknown") for d in all_datasets[:10]]
-            error_msg = f"数据集不存在: {dataset_name}。可用数据集（前10个）: {', '.join(available_names)}"
-            
-            raise HTTPException(
-                status_code=404, 
-                detail=error_msg
-            )
+            error_msg = f"数据集不存在: {dataset_name}。可用数据集: {', '.join(available_names)}"
+            raise HTTPException(status_code=404, detail=error_msg)
         
-        # 检查是否有本地路径
+        # 检查并加载本地路径
         local_path = dataset_info.get("local_path")
         if not local_path:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"数据集 '{dataset_name}' 没有本地路径，无法加载样本。请先下载数据集。"
-            )
+            raise HTTPException(status_code=404, detail=f"数据集 '{dataset_name}' 未下载")
         
-        # 检查本地路径是否存在
-        from pathlib import Path
         local_path_obj = Path(local_path)
         if not local_path_obj.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"数据集本地路径不存在: {local_path}"
-            )
+            raise HTTPException(status_code=404, detail=f"本地路径不存在: {local_path}")
         
-        # 从本地加载数据集（使用超时保护）
+        # 核心修复：如果是 group 数据集，无法直接加载，尝试加载其第一个子任务
+        subtasks = dataset_info.get("subtasks")
+        load_path = local_path
+        
+        # 1. 优先尝试已知的子任务
+        found_valid_path = False
+        if subtasks and len(subtasks) > 0:
+            for subtask_name in subtasks:
+                potential_path = local_path_obj / subtask_name
+                if potential_path.exists() and ((potential_path / 'dataset_dict.json').exists() or (potential_path / 'dataset_info.json').exists()):
+                    print(f"[DEBUG] 从已知子任务 '{subtask_name}' 加载样本预览")
+                    load_path = str(potential_path)
+                    found_valid_path = True
+                    break
+        
+        # 2. 如果没有子任务信息，或者路径无效，尝试自动扫描一层子目录
+        if not found_valid_path:
+            try:
+                for sub_dir in local_path_obj.iterdir():
+                    if sub_dir.is_dir() and ((sub_dir / 'dataset_dict.json').exists() or (sub_dir / 'dataset_info.json').exists()):
+                        print(f"[DEBUG] 自动发现子任务目录 '{sub_dir.name}'，加载样本预览")
+                        load_path = str(sub_dir)
+                        found_valid_path = True
+                        break
+            except Exception:
+                pass
+
         try:
-            dataset_path_str = str(local_path)
-            dataset = load_from_disk(dataset_path_str)
-            
-            # 验证数据集是否成功加载
-            if not dataset or not isinstance(dataset, dict):
-                raise ValueError(f"数据集加载失败：返回的数据不是字典格式")
+            # 只有当路径确实是数据集时才尝试加载
+            if not found_valid_path and not ((local_path_obj / 'dataset_dict.json').exists() or (local_path_obj / 'dataset_info.json').exists()):
+                # 这是一个纯目录组，且没有找到有效的子数据集
+                print(f"[DEBUG] '{dataset_name}' 是纯目录组，未找到子数据集，返回空样本")
+                return []
                 
+            dataset = load_from_disk(load_path)
+            if not dataset or not isinstance(dataset, dict):
+                raise ValueError("数据集加载格式错误")
         except Exception as e:
-            error_detail = f"加载本地数据集失败: {str(e)}"
-            raise HTTPException(status_code=500, detail=error_detail)
+            error_msg = str(e)
+            print(f"[DEBUG] load_from_disk failed for {load_path}: {error_msg}")
+            # 如果是目录，且加载失败，返回空列表而不是 500
+            if local_path_obj.is_dir():
+                return []
+            raise HTTPException(status_code=500, detail=f"加载失败: {error_msg}")
         
-        # 检查 split 是否存在
         if split not in dataset:
-            available_splits = list(dataset.keys())
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Split '{split}' 不存在。可用 splits: {', '.join(available_splits)}"
-            )
+            raise HTTPException(status_code=404, detail=f"Split '{split}' 不存在")
         
-        # 获取样本
+        # 获取样本并更新缓存
         try:
             split_dataset = dataset[split]
             samples = split_dataset[:limit]
-            
-            # 转换为字典列表
             if isinstance(samples, dict):
-                # 单个样本
                 sample_list = [{k: v[i] for k, v in samples.items()} for i in range(len(next(iter(samples.values()))))]
             else:
                 sample_list = [dict(sample) for sample in samples]
-                
-        except Exception as e:
-            error_detail = f"读取样本失败: {str(e)}"
-            raise HTTPException(status_code=500, detail=error_detail)
-        
-        # 更新缓存（带大小限制）
-        with _samples_cache_lock:
-            # 如果缓存已满，删除最旧的条目
-            if len(_samples_cache) >= MAX_SAMPLES_CACHE_SIZE:
-                # 删除第一个（最旧的）条目
-                first_key = next(iter(_samples_cache))
-                del _samples_cache[first_key]
             
-            _samples_cache[cache_key] = sample_list
-        
-        return sample_list
-        
+            with _samples_cache_lock:
+                if len(_samples_cache) >= MAX_SAMPLES_CACHE_SIZE:
+                    first_key = next(iter(_samples_cache))
+                    del _samples_cache[first_key]
+                _samples_cache[cache_key] = sample_list
+            
+            return sample_list
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"读取样本失败: {str(e)}")
+            
     except HTTPException:
         raise
     except Exception as e:
-        # 捕获所有未预期的异常
         import traceback
-        error_detail = f"获取数据集样本时发生错误: {str(e)}"
-        print(error_detail)
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=error_detail)
+        raise HTTPException(status_code=500, detail=f"获取样本时发生错误: {str(e)}")
 
 
 
@@ -1020,6 +1024,7 @@ async def get_dataset(dataset_id: str):
     # URL 解码（前端可能会编码 /）
     from urllib.parse import unquote
     dataset_id = unquote(dataset_id)
+    print(f"[DEBUG] get_dataset called for dataset_id: {dataset_id}")
     
     # 1. 优先匹配 ID（精确匹配）
     for dataset_info in all_datasets:

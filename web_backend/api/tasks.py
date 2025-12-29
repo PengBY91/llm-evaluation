@@ -13,14 +13,22 @@ import re
 from pathlib import Path
 import threading
 import lm_eval
-from lm_eval.tasks import TaskManager
+# from lm_eval.tasks import TaskManager  # Moved to lazy loading
 # 导入模型相关的函数
 from api.models import get_model_args, load_model_from_file
 
 router = APIRouter()
 
-# 全局 TaskManager 实例
-task_manager = TaskManager()
+# 全局 TaskManager 实例（懒加载）
+_task_manager = None
+def get_task_manager():
+    global _task_manager
+    if _task_manager is None:
+        print("[DEBUG] Initializing TaskManager (this might take a while)...")
+        from lm_eval.tasks import TaskManager
+        _task_manager = TaskManager()
+        print("[DEBUG] TaskManager initialized.")
+    return _task_manager
 
 # 存储任务状态（使用文件持久化）
 TASKS_DIR = Path(__file__).parent.parent.parent / "data" / "tasks"
@@ -69,7 +77,9 @@ def load_all_tasks_from_files():
 
 
 # 启动时加载所有任务
+print("[DEBUG] Loading tasks from files...")
 tasks_db = load_all_tasks_from_files()
+print(f"[DEBUG] Loaded {len(tasks_db)} tasks.")
 
 
 class DatasetInfo(BaseModel):
@@ -315,11 +325,12 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                 error_message = f"任务 '{task_name}' 执行失败。请检查任务配置、模型参数或数据集是否正确。"
             else:
                 # 可能是任务名称匹配问题
-                available_tasks = set(task_manager.all_subtasks)
-                available_groups = set(task_manager.all_groups)
+                tm = get_task_manager()
+                available_tasks = set(tm.all_subtasks)
+                available_groups = set(tm.all_groups)
                 available_all = available_tasks.union(available_groups)
-                if hasattr(task_manager, 'all_tasks'):
-                    available_all = available_all.union(set(task_manager.all_tasks))
+                if hasattr(tm, 'all_tasks'):
+                    available_all = available_all.union(set(tm.all_tasks))
                 
                 if task_name not in available_all:
                     error_message = f"任务 '{task_name}' 未找到。请确认任务名称是否正确，或使用 '修复任务名称' 功能修复。"
@@ -379,17 +390,14 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         normalized_tasks = request.tasks
     
     # 检查是否有无效的任务名称
-    # 注意：TaskManager 的 all_subtasks 和 all_groups 可能不包含所有有效的任务名称
-    # 尤其是对于使用 yaml 配置文件动态加载的任务，或者某些通过 path 加载的任务
-    # 因此，如果任务名称在 TaskManager 中找不到，但它看起来像是一个有效的任务（例如 path 格式），我们尝试信任它
-    
-    available_tasks = set(task_manager.all_subtasks)
-    available_groups = set(task_manager.all_groups)
+    tm = get_task_manager()
+    available_tasks = set(tm.all_subtasks)
+    available_groups = set(tm.all_groups)
     available_all = available_tasks.union(available_groups)
     
     # 尝试将 task_manager.all_tasks 也加入，以防遗漏
-    if hasattr(task_manager, 'all_tasks'):
-        available_all = available_all.union(set(task_manager.all_tasks))
+    if hasattr(tm, 'all_tasks'):
+        available_all = available_all.union(set(tm.all_tasks))
     
     invalid_tasks = []
     for t in normalized_tasks:
@@ -733,11 +741,12 @@ async def get_task_progress(task_id: str):
 async def get_available_tasks():
     """获取所有可用的评测任务列表"""
     try:
+        tm = get_task_manager()
         return {
-            "subtasks": task_manager.all_subtasks,
-            "groups": task_manager.all_groups,
-            "tags": task_manager.all_tags,
-            "all_tasks": task_manager.all_tasks
+            "subtasks": tm.all_subtasks,
+            "groups": tm.all_groups,
+            "tags": tm.all_tags,
+            "all_tasks": tm.all_tasks
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
