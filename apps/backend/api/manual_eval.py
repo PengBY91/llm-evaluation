@@ -16,7 +16,7 @@ from api.models import models_db, load_model_from_file
 router = APIRouter()
 
 # 手动评测结果存储目录
-MANUAL_EVALS_DIR = Path(__file__).parent.parent.parent / "data" / "manual_evals"
+MANUAL_EVALS_DIR = Path(__file__).parent.parent.parent.parent / "outputs" / "manual_evals"
 MANUAL_EVALS_DIR.mkdir(parents=True, exist_ok=True)
 
 class GenerateRequest(BaseModel):

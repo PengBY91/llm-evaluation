@@ -19,7 +19,7 @@ fi
 # 检查并安装依赖
 echo ""
 echo "正在检查依赖..."
-cd web_backend
+cd apps/backend
 if [ -f "requirements.txt" ]; then
     echo "发现 requirements.txt，正在检查依赖..."
     python -c "import fastapi" 2>/dev/null

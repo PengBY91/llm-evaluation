@@ -13,7 +13,7 @@ from pathlib import Path
 router = APIRouter()
 
 # 配置存储目录
-CONFIGS_DIR = Path(__file__).parent.parent.parent / "configs"
+CONFIGS_DIR = Path(__file__).parent.parent.parent.parent / "configs"
 CONFIGS_DIR.mkdir(exist_ok=True)
 
 # 内存中的配置（实际应用中应使用数据库）

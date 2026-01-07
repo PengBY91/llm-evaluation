@@ -13,8 +13,8 @@ from datasets import load_from_disk, DatasetDict, Dataset
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
 TASKS_DIR = PROJECT_ROOT / "lm_eval" / "tasks"
-DATA_DIR = PROJECT_ROOT / "data"
-DATASETS_METADATA_DIR = PROJECT_ROOT / "datasets_metadata"
+DATA_DIR = PROJECT_ROOT / "assets" / "data"
+DATASETS_METADATA_DIR = PROJECT_ROOT / "assets" / "datasets_metadata"
 
 # 添加项目根目录到路径，以便导入模块
 sys.path.insert(0, str(PROJECT_ROOT))

@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional
 
 # 添加项目根目录到 sys.path，以便导入 web_backend.api.datasets
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../web_backend')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../apps/backend')))
 
 # 尝试导入 datasets 相关的函数
 # 由于 web_backend 结构问题，我们可能需要复制部分逻辑或者直接修改 web_backend/api/datasets.py 使其更模块化
@@ -29,7 +29,7 @@ def main():
     print("开始索引数据集...")
     
     try:
-        from web_backend.api import datasets
+        from apps.backend.api import datasets
         
         # 调用后端 API 中的重建索引逻辑
         # 我们将在 api/datasets.py 中添加一个 rebuild_dataset_index 函数
@@ -38,7 +38,7 @@ def main():
             print(f"索引完成，共找到 {len(datasets_list)} 个数据集")
             print(f"索引文件已保存到: {datasets.INDEX_FILE}")
         else:
-            print("错误: web_backend.api.datasets 模块中未找到 rebuild_dataset_index 函数")
+            print("错误: apps.backend.api.datasets 模块中未找到 rebuild_dataset_index 函数")
             print("请先更新后端代码")
             sys.exit(1)
             

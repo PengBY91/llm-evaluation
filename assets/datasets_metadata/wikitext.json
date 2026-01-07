@@ -1,0 +1,10 @@
+{
+  "splits": [
+    "validation",
+    "test"
+  ],
+  "num_examples": {
+    "validation": 60,
+    "test": 62
+  }
+}

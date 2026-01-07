@@ -83,14 +83,14 @@ async def get_task_manager_async():
     return await loop.run_in_executor(None, get_task_manager)
 
 # 存储任务状态（使用文件持久化）
-TASKS_DIR = Path(__file__).parent.parent.parent / "tasks"
+TASKS_DIR = Path(__file__).parent.parent.parent.parent / "outputs" / "tasks"
 TASKS_DIR.mkdir(parents=True, exist_ok=True)
 
 tasks_db: Dict[str, Dict[str, Any]] = {}
 tasks_lock = threading.Lock()
 
 # 结果存储目录
-RESULTS_DIR = Path(__file__).parent.parent.parent / "results"
+RESULTS_DIR = Path(__file__).parent.parent.parent.parent / "outputs" / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
 
@@ -268,12 +268,12 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
     from pathlib import Path
     
     # 设置缓存目录到项目根目录（便于离线部署）
-    project_root = Path(__file__).parent.parent.parent
-    cache_dir = project_root / "cache"
+    project_root = Path(__file__).parent.parent.parent.parent
+    cache_dir = project_root / "outputs" / "cache"
     cache_dir.mkdir(exist_ok=True)
     
     # 创建日志目录和任务日志文件
-    logs_dir = project_root / "logs"
+    logs_dir = project_root / "outputs" / "logs"
     logs_dir.mkdir(exist_ok=True)
     log_file = logs_dir / f"task_{task_id}.log"
     

@@ -14,11 +14,11 @@ import json
 router = APIRouter()
 
 # 数据集存储目录
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
+DATA_DIR = Path(__file__).parent.parent.parent.parent / "assets" / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 # 数据集元数据存储目录
-DATASETS_METADATA_DIR = Path(__file__).parent.parent.parent / "data" / "datasets_metadata"
+DATASETS_METADATA_DIR = Path(__file__).parent.parent.parent.parent / "assets" / "datasets_metadata"
 DATASETS_METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # 数据集索引文件
