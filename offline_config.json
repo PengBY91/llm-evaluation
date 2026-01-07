@@ -1,0 +1,15 @@
+{
+  "offline_mode": true,
+  "data_dir": "/mnt/d/code/llm-evaluation/data",
+  "cache_dir": "/mnt/d/code/llm-evaluation/cache",
+  "hf_cache_dir": "/mnt/d/code/llm-evaluation/cache/huggingface",
+  "environment_variables": {
+    "HF_HOME": "/mnt/d/code/llm-evaluation/cache/huggingface",
+    "HF_DATASETS_CACHE": "/mnt/d/code/llm-evaluation/cache/huggingface/datasets",
+    "TRANSFORMERS_CACHE": "/mnt/d/code/llm-evaluation/cache/huggingface/transformers",
+    "HF_EVALUATE_CACHE": "/mnt/d/code/llm-evaluation/cache/huggingface/evaluate",
+    "HF_DATASETS_OFFLINE": "1",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1"
+  }
+}

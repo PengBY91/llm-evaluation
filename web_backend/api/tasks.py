@@ -21,14 +21,66 @@ router = APIRouter()
 
 # 全局 TaskManager 实例（懒加载）
 _task_manager = None
+_task_manager_lock = threading.Lock()
+
+# 缓存文件路径
+CACHE_DIR = Path(__file__).parent.parent.parent / "cache"
+TASK_MANAGER_CACHE_FILE = CACHE_DIR / "task_manager_cache.json"
+
+
+class CachedTaskManager:
+    """轻量级 TaskManager，从 JSON 缓存加载，避免扫描 YAML 文件"""
+    
+    def __init__(self, cache_data: dict):
+        self.all_subtasks = cache_data.get("all_subtasks", [])
+        self.all_groups = cache_data.get("all_groups", [])
+        self.all_tags = cache_data.get("all_tags", [])
+        self.all_tasks = cache_data.get("all_tasks", [])
+        self._cached_at = cache_data.get("cached_at", "unknown")
+    
+    def __repr__(self):
+        return f"CachedTaskManager(subtasks={len(self.all_subtasks)}, groups={len(self.all_groups)}, cached_at={self._cached_at})"
+
+
 def get_task_manager():
+    """同步获取 TaskManager（优先从缓存加载）"""
     global _task_manager
-    if _task_manager is None:
-        print("[DEBUG] Initializing TaskManager (this might take a while)...")
-        from lm_eval.tasks import TaskManager
-        _task_manager = TaskManager()
-        print("[DEBUG] TaskManager initialized.")
+    with _task_manager_lock:
+        if _task_manager is None:
+            # 优先尝试从缓存加载
+            if TASK_MANAGER_CACHE_FILE.exists():
+                try:
+                    import json
+                    print("[DEBUG] Loading TaskManager from cache...")
+                    with open(TASK_MANAGER_CACHE_FILE, "r", encoding="utf-8") as f:
+                        cache_data = json.load(f)
+                    _task_manager = CachedTaskManager(cache_data)
+                    print(f"[DEBUG] TaskManager loaded from cache: {_task_manager}")
+                except Exception as e:
+                    print(f"[WARNING] Failed to load TaskManager cache: {e}")
+                    _task_manager = None
+            
+            # 如果缓存不存在或加载失败，使用完整初始化
+            if _task_manager is None:
+                print("[DEBUG] Initializing TaskManager (this might take a while)...")
+                print("[TIP] 运行 'python scripts/cache_task_manager.py' 可以预缓存，加速后续启动")
+                from lm_eval.tasks import TaskManager
+                _task_manager = TaskManager()
+                print("[DEBUG] TaskManager initialized.")
     return _task_manager
+
+
+async def get_task_manager_async():
+    """异步获取 TaskManager（用于 async 路由，不阻塞事件循环）"""
+    import asyncio
+    
+    global _task_manager
+    if _task_manager is not None:
+        return _task_manager
+    
+    # 在线程池中运行初始化，避免阻塞事件循环
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, get_task_manager)
 
 # 存储任务状态（使用文件持久化）
 TASKS_DIR = Path(__file__).parent.parent.parent / "tasks"
@@ -212,11 +264,65 @@ class TaskResponse(BaseModel):
 def run_evaluation(task_id: str, request: TaskCreateRequest):
     """在后台运行评测任务"""
     import os
+    import logging
+    from pathlib import Path
+    
+    # 设置缓存目录到项目根目录（便于离线部署）
+    project_root = Path(__file__).parent.parent.parent
+    cache_dir = project_root / "cache"
+    cache_dir.mkdir(exist_ok=True)
+    
+    # 创建日志目录和任务日志文件
+    logs_dir = project_root / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    log_file = logs_dir / f"task_{task_id}.log"
+    
+    # 配置任务专用 logger
+    task_logger = logging.getLogger(f"evaluation.{task_id}")
+    task_logger.setLevel(logging.DEBUG)
+    
+    # 清除已有的 handlers（防止重复添加）
+    task_logger.handlers.clear()
+    
+    # 文件 handler - 保存详细日志到文件
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    file_handler.setFormatter(file_formatter)
+    task_logger.addHandler(file_handler)
+    
+    # 控制台 handler - 打印到控制台
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(file_formatter)
+    task_logger.addHandler(console_handler)
+    
+    task_logger.info(f"=" * 60)
+    task_logger.info(f"开始评测任务: {request.name}")
+    task_logger.info(f"任务 ID: {task_id}")
+    task_logger.info(f"日志文件: {log_file}")
+    task_logger.info(f"=" * 60)
+    
+    os.environ["HF_HOME"] = str(cache_dir / "huggingface")
+    os.environ["HF_DATASETS_CACHE"] = str(cache_dir / "huggingface" / "datasets")
+    os.environ["TRANSFORMERS_CACHE"] = str(cache_dir / "huggingface" / "transformers")
+    
+    # 设置离线模式环境变量，确保不访问网络下载数据集和指标
+    os.environ["HF_DATASETS_OFFLINE"] = "1"
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    
+    task_logger.info(f"环境配置完成 - 离线模式: HF_DATASETS_OFFLINE=1")
+    task_logger.info(f"缓存目录: {cache_dir / 'huggingface'}")
     
     try:
         with tasks_lock:
             tasks_db[task_id]["status"] = "running"
             tasks_db[task_id]["updated_at"] = datetime.now().isoformat()
+            tasks_db[task_id]["log_file"] = str(log_file)  # 保存日志文件路径
             save_task_to_file(task_id, tasks_db[task_id])
 
         # 确保 model_args 被正确初始化
@@ -321,7 +427,9 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                     request.model_args["aiohttp_client_timeout"] = 120
                     print(f"[INFO] 设置 aiohttp 超时为 120 秒以适应代理环境")
         
-        print(f"[DEBUG] 评测参数 - model: {request.model}, base_url: {request.model_args.get('base_url')}, model_args keys: {list(request.model_args.keys()) if request.model_args else None}")
+        task_logger.info(f"模型类型: {request.model}")
+        task_logger.info(f"模型 API 地址: {request.model_args.get('base_url')}")
+        task_logger.debug(f"model_args 参数: {list(request.model_args.keys()) if request.model_args else None}")
         
         if request.num_fewshot is not None:
             eval_kwargs["num_fewshot"] = request.num_fewshot
@@ -339,7 +447,14 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             eval_kwargs["gen_kwargs"] = request.gen_kwargs
 
         # 运行评测
+        task_logger.info(f"开始运行评测，任务列表: {request.tasks}")
+        task_logger.info(f"其他参数: num_fewshot={request.num_fewshot}, batch_size={request.batch_size}, limit={request.limit}")
+        
+        import time as _time
+        start_time = _time.time()
         results = lm_eval.simple_evaluate(**eval_kwargs)
+        elapsed_time = _time.time() - start_time
+        task_logger.info(f"评测完成，耗时: {elapsed_time:.2f} 秒")
         
         # 检查结果是否有效
         if results is None:
@@ -353,6 +468,16 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
         with open(result_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
 
+        task_logger.info(f"结果已保存到: {result_file}")
+        
+        # 记录结果摘要
+        if "results" in results:
+            for task_name, task_results in results["results"].items():
+                if isinstance(task_results, dict):
+                    metrics_str = ", ".join([f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" 
+                                            for k, v in task_results.items() if not k.endswith(",stderr")])
+                    task_logger.info(f"  {task_name}: {metrics_str}")
+        
         # 更新任务状态
         with tasks_lock:
             tasks_db[task_id]["status"] = "completed"
@@ -379,6 +504,12 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             save_task_to_file(task_id, tasks_db[task_id])
 
     except Exception as e:
+        import traceback
+        
+        # 记录错误日志
+        task_logger.error(f"评测任务失败: {str(e)}")
+        task_logger.error(f"错误详情:\n{traceback.format_exc()}")
+        
         # 恢复原始环境变量（如果之前修改过）
         if original_api_key is not None:
             if original_api_key:
@@ -476,8 +607,8 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
     else:
         normalized_tasks = request.tasks
     
-    # 检查是否有无效的任务名称
-    tm = get_task_manager()
+    # 检查是否有无效的任务名称（使用异步版本避免阻塞事件循环）
+    tm = await get_task_manager_async()
     available_tasks = set(tm.all_subtasks)
     available_groups = set(tm.all_groups)
     available_all = available_tasks.union(available_groups)
@@ -828,7 +959,7 @@ async def get_task_progress(task_id: str):
 async def get_available_tasks():
     """获取所有可用的评测任务列表"""
     try:
-        tm = get_task_manager()
+        tm = await get_task_manager_async()
         return {
             "subtasks": tm.all_subtasks,
             "groups": tm.all_groups,
@@ -837,3 +968,68 @@ async def get_available_tasks():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
+
+
+@router.get("/{task_id}/logs")
+async def get_task_logs(
+    task_id: str, 
+    lines: int = None,
+    tail: bool = False
+):
+    """获取任务执行日志
+    
+    Args:
+        task_id: 任务 ID
+        lines: 返回的行数限制（默认返回全部）
+        tail: 是否只返回最后几行（类似 tail 命令）
+    """
+    from pathlib import Path
+    
+    # 日志文件路径
+    project_root = Path(__file__).parent.parent.parent
+    log_file = project_root / "logs" / f"task_{task_id}.log"
+    
+    if not log_file.exists():
+        raise HTTPException(status_code=404, detail="日志文件不存在")
+    
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        if lines is not None and lines > 0:
+            all_lines = content.split("\n")
+            if tail:
+                # 返回最后 N 行
+                selected_lines = all_lines[-lines:]
+            else:
+                # 返回前 N 行
+                selected_lines = all_lines[:lines]
+            content = "\n".join(selected_lines)
+        
+        return {
+            "task_id": task_id,
+            "log_file": str(log_file),
+            "content": content
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取日志失败: {str(e)}")
+
+
+@router.get("/{task_id}/logs/download")
+async def download_task_logs(task_id: str):
+    """下载任务日志文件"""
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    
+    project_root = Path(__file__).parent.parent.parent
+    log_file = project_root / "logs" / f"task_{task_id}.log"
+    
+    if not log_file.exists():
+        raise HTTPException(status_code=404, detail="日志文件不存在")
+    
+    return FileResponse(
+        str(log_file),
+        media_type="text/plain",
+        filename=f"task_{task_id}.log"
+    )
+

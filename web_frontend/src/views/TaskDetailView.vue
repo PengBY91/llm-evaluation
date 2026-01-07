@@ -47,12 +47,40 @@
             {{ getStatusText(currentTask.status) }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="模型">
-          {{ currentTask.model_name || currentTask.model }}
+        <el-descriptions-item label="模型类型">
+          {{ currentTask.model || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="模型标识">
+          {{ currentTask.model_name || currentTask.model_args?.model || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="API 端点" v-if="currentTask.model_args?.base_url">
+          <el-link :href="currentTask.model_args.base_url" target="_blank" type="primary">{{ currentTask.model_args.base_url }}</el-link>
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ formatTime(currentTask.created_at) }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ formatTime(currentTask.updated_at) }}</el-descriptions-item>
+        <el-descriptions-item label="执行时长" v-if="executionTime">
+          <el-tag type="info">{{ executionTime }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="并发数" v-if="currentTask.model_args?.num_concurrent">
+          {{ currentTask.model_args.num_concurrent }}
+        </el-descriptions-item>
       </el-descriptions>
+      
+      <el-divider />
+      
+      <!-- 模型参数详情 -->
+      <div v-if="currentTask.model_args && Object.keys(currentTask.model_args).length > 0" style="margin-bottom: 20px;">
+        <h3>模型参数</h3>
+        <el-descriptions border :column="3" size="small">
+          <el-descriptions-item 
+            v-for="(value, key) in filteredModelArgs" 
+            :key="key" 
+            :label="formatParamName(key)"
+          >
+            {{ formatParamValue(key, value) }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
       
       <el-divider />
       
@@ -86,10 +114,15 @@
               :key="metric" 
               :prop="metric" 
               :label="formatMetricName(metric)"
-              width="150"
+              width="180"
             >
               <template #default="{ row }">
-                {{ formatMetricValue(row[metric]) }}
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span>{{ formatMetricValue(row[metric]) }}</span>
+                  <el-tag v-if="isPercentageMetric(metric)" size="small" :type="getMetricTagType(row[metric])">
+                    {{ formatPercentage(row[metric]) }}
+                  </el-tag>
+                </div>
               </template>
             </el-table-column>
             <el-table-column prop="samples" label="样本数" width="100" />
@@ -221,6 +254,72 @@ const summaryMetrics = computed(() => {
   const firstRow = resultsSummaryTable.value[0]
   return Object.keys(firstRow).filter(key => key !== 'task' && key !== 'samples')
 })
+
+// 计算执行时长
+const executionTime = computed(() => {
+  if (!currentTask.value) return null
+  const created = new Date(currentTask.value.created_at)
+  const updated = new Date(currentTask.value.updated_at)
+  const diffMs = updated - created
+  
+  if (diffMs < 1000) return `${diffMs}ms`
+  if (diffMs < 60000) return `${(diffMs / 1000).toFixed(1)}秒`
+  if (diffMs < 3600000) return `${(diffMs / 60000).toFixed(1)}分钟`
+  return `${(diffMs / 3600000).toFixed(2)}小时`
+})
+
+// 过滤模型参数（排除敏感信息）
+const filteredModelArgs = computed(() => {
+  if (!currentTask.value?.model_args) return {}
+  const filtered = {}
+  const excludeKeys = ['api_key', 'tokenizer'] // 排除敏感或冗长的参数
+  
+  Object.keys(currentTask.value.model_args).forEach(key => {
+    if (!excludeKeys.includes(key)) {
+      filtered[key] = currentTask.value.model_args[key]
+    }
+  })
+  return filtered
+})
+
+const formatParamName = (key) => {
+  const nameMap = {
+    'model': '模型名称',
+    'base_url': 'API地址',
+    'num_concurrent': '并发数',
+    'max_length': '最大长度',
+    'batch_size': '批处理大小',
+    'temperature': '温度',
+    'top_p': 'Top P',
+    'aiohttp_client_timeout': '超时时间'
+  }
+  return nameMap[key] || key
+}
+
+const formatParamValue = (key, value) => {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+const isPercentageMetric = (metric) => {
+  // 判断是否是百分比类型的指标（通常是0-1之间的小数）
+  const percentageMetrics = ['acc', 'accuracy', 'f1', 'exact_match', 'em']
+  return percentageMetrics.some(pm => metric.toLowerCase().includes(pm))
+}
+
+const formatPercentage = (value) => {
+  if (typeof value !== 'number') return ''
+  return `${(value * 100).toFixed(2)}%`
+}
+
+const getMetricTagType = (value) => {
+  if (typeof value !== 'number') return 'info'
+  if (value >= 0.9) return 'success'
+  if (value >= 0.7) return 'warning'
+  return 'danger'
+}
 
 const formatMetricName = (key) => {
   // 简单格式化指标名称

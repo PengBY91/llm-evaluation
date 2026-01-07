@@ -616,10 +616,24 @@ def get_metric(name: str, hf_evaluate_metric: bool = False) -> Callable | None:
     Returns:
         The metric compute function, or None if not found
     """
+    import os
+    
     # Auto-import metrics module if registry is empty (lazy initialization)
     if len(metric_registry) == 0:
         import lm_eval.api.metrics  # noqa: F401
 
+    # 离线模式：仅使用本地注册的 metrics，不尝试远程加载
+    offline_mode = os.environ.get("HF_HUB_OFFLINE") == "1"
+    
+    if offline_mode:
+        if name in metric_registry:
+            return metric_registry.get(name)
+        else:
+            eval_logger.warning(
+                f"[离线模式] 无法找到 metric '{name}'，请确保该 metric 已在本地注册"
+            )
+            return None
+    
     if not hf_evaluate_metric:
         if name in metric_registry:
             return metric_registry.get(name)

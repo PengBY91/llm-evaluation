@@ -986,6 +986,8 @@ class ConfigurableTask(Task):
 
     def download(self, dataset_kwargs: dict[str, Any] | None = None, **kwargs) -> None:
         from packaging.version import parse as vparse
+        import os
+        from pathlib import Path
 
         if dataset_kwargs and vparse(datasets.__version__) >= vparse("4.0.0"):
             dataset_kwargs.pop("trust_remote_code", None)
@@ -998,11 +1000,68 @@ class ConfigurableTask(Task):
                 **(self.config.metadata or {}), **(self.config.dataset_kwargs or {})
             )
         else:
-            self.dataset = datasets.load_dataset(
-                path=self.DATASET_PATH,
-                name=self.DATASET_NAME,
-                **dataset_kwargs if dataset_kwargs is not None else {},
-            )
+            # 离线模式支持：优先从本地 /data 目录加载
+            offline_mode = os.environ.get("HF_DATASETS_OFFLINE") == "1"
+            loaded_from_local = False
+            
+            if offline_mode:
+                # 尝试从本地 data 目录加载
+                # 项目结构: lm_eval/api/task.py -> 根目录/data/
+                local_data_dir = Path(__file__).parent.parent.parent / "data"
+                
+                if local_data_dir.exists():
+                    # 尝试多种可能的本地路径
+                    possible_paths = []
+                    
+                    # 路径1: data/{dataset_path} (如 data/mmlu)
+                    if self.DATASET_PATH:
+                        path_normalized = self.DATASET_PATH.replace("/", "_")
+                        possible_paths.append(local_data_dir / path_normalized)
+                        possible_paths.append(local_data_dir / self.DATASET_PATH.split("/")[-1])
+                    
+                    # 路径2: data/{dataset_path}/{dataset_name} (如 data/arc/ARC-Challenge)
+                    if self.DATASET_PATH and self.DATASET_NAME:
+                        path_normalized = self.DATASET_PATH.replace("/", "_")
+                        possible_paths.append(local_data_dir / path_normalized / self.DATASET_NAME)
+                        possible_paths.append(local_data_dir / self.DATASET_PATH.split("/")[-1] / self.DATASET_NAME)
+                    
+                    # 路径3: 直接使用任务名 (如 data/mmlu, data/gsm8k)
+                    task_name = self.config.task if hasattr(self.config, 'task') else None
+                    if task_name:
+                        possible_paths.append(local_data_dir / task_name)
+                        # 处理带下划线的任务名，如 mmlu_abstract_algebra -> mmlu/abstract_algebra
+                        if "_" in task_name:
+                            parts = task_name.split("_", 1)
+                            possible_paths.append(local_data_dir / parts[0] / parts[1])
+                            possible_paths.append(local_data_dir / parts[0])
+                    
+                    # 尝试每个可能的路径
+                    for local_path in possible_paths:
+                        if local_path.exists():
+                            # 检查是否是有效的数据集目录
+                            if (local_path / "dataset_dict.json").exists() or (local_path / "dataset_info.json").exists():
+                                try:
+                                    eval_logger.info(f"[离线模式] 从本地加载数据集: {local_path}")
+                                    self.dataset = datasets.load_from_disk(str(local_path))
+                                    loaded_from_local = True
+                                    eval_logger.info(f"[离线模式] 成功加载数据集，splits: {list(self.dataset.keys())}")
+                                    break
+                                except Exception as e:
+                                    eval_logger.warning(f"[离线模式] 加载本地数据集失败 {local_path}: {e}")
+                    
+                    if not loaded_from_local:
+                        eval_logger.warning(
+                            f"[离线模式] 未找到本地数据集: {self.DATASET_PATH}/{self.DATASET_NAME}. "
+                            f"尝试过的路径: {[str(p) for p in possible_paths if p.exists()]}"
+                        )
+            
+            # 如果离线模式下没有加载成功，或者非离线模式，使用远程加载
+            if not loaded_from_local:
+                self.dataset = datasets.load_dataset(
+                    path=self.DATASET_PATH,
+                    name=self.DATASET_NAME,
+                    **dataset_kwargs if dataset_kwargs is not None else {},
+                )
 
     def has_training_docs(self) -> bool:
         if self.config.training_split is not None:
@@ -1046,6 +1105,13 @@ class ConfigurableTask(Task):
 
     def fewshot_docs(self):
         if self.config.fewshot_split is not None:
+            # 检查 fewshot_split 是否存在于数据集中
+            if self.config.fewshot_split not in self.dataset:
+                eval_logger.warning(
+                    f"[离线模式] fewshot_split '{self.config.fewshot_split}' 不存在于数据集中。"
+                    f"可用的 splits: {list(self.dataset.keys())}。将跳过 few-shot 示例。"
+                )
+                return None
             if self.config.process_docs is not None:
                 return self.config.process_docs(self.dataset[self.config.fewshot_split])
             return self.dataset[self.config.fewshot_split]
