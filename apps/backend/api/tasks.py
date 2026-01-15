@@ -370,6 +370,7 @@ class TaskCreateRequest(BaseModel):
     datasets: Optional[List[DatasetInfo]] = None  # 可选的数据集信息，用于验证和提供更多上下文
     num_fewshot: Optional[int] = None
     batch_size: Optional[int] = None
+    num_concurrent: Optional[int] = None  # 并发请求数（覆盖模型配置中的 max_concurrent）
     device: Optional[str] = None
     limit: Optional[int] = None
     log_samples: bool = True
@@ -680,14 +681,28 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             task_logger.info("检测到 DeepSeek 模型使用了错误的 openai-completions 类型，强制切换为 local-chat-completions")
             request.model = "local-chat-completions"
             
-            # 修复 URL (如果有必要)
+            # 修复 URL (更加鲁棒的 URL 规范化，解决 404 /chat/chat/completions 问题)
             if "base_url" in request.model_args:
                 base_url = request.model_args["base_url"]
-                if base_url.endswith("/completions/completions"):
-                     request.model_args["base_url"] = base_url.replace("/completions/completions", "/chat/completions")
-                elif base_url.endswith("/completions") and "chat" not in base_url:
-                     request.model_args["base_url"] = base_url.replace("/completions", "/chat/completions")
-                print(f"[INFO] DeepSeek 强制切换: model={request.model}, base_url={request.model_args['base_url']}")
+                
+                # 循环剥离已有的后缀，直到回退到根路径或 /v1 之前的路径
+                temp_url = base_url
+                for _ in range(3):
+                    temp_url = temp_url.rstrip("/")
+                    if temp_url.endswith("/completions"):
+                        temp_url = temp_url[:-12]
+                    elif temp_url.endswith("/chat"):
+                        temp_url = temp_url[:-5]
+                    elif temp_url.endswith("/v1"):
+                        temp_url = temp_url[:-3]
+                    else:
+                        break
+                
+                # 重新构造成标准的 /v1/chat/completions
+                request.model_args["base_url"] = temp_url.rstrip("/") + "/v1/chat/completions"
+                
+                print(f"[INFO] DeepSeek 规范化 URL: {base_url} -> {request.model_args['base_url']}")
+                task_logger.info(f"DeepSeek 强制切换: model={request.model}, base_url={request.model_args['base_url']}")
         
         # 准备评测参数
         eval_kwargs = {
@@ -699,10 +714,14 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
 
         # 针对 API 模型自动优化并发参数
         if request.model in ["openai-chat-completions", "openai-completions", "local-completions", "local-chat-completions"]:
-            # 如果没有显式设置 num_concurrent，则设置默认值以提高并发性能
-            # 默认值设为 100，这对于大多数现代 API 提供商（OpenAI, DeepSeek, vLLM 等）都是理想的并发值
-            if "num_concurrent" not in request.model_args:
-                default_concurrent = 1 # 降低默认并发数，避免 429/500 Errors
+            # 优先级: request.num_concurrent > model_args["num_concurrent"] > 默认值(5)
+            if request.num_concurrent is not None:
+                # 用户在任务配置中显式设置了并发数
+                request.model_args["num_concurrent"] = request.num_concurrent
+                print(f"[INFO] 使用任务配置的并发数: num_concurrent={request.num_concurrent}")
+            elif "num_concurrent" not in request.model_args:
+                # 从模型配置或默认值获取
+                default_concurrent = 5
                 request.model_args["num_concurrent"] = default_concurrent
                 print(f"[INFO] 自动优化: 为 API 模型设置 num_concurrent={default_concurrent}")
             

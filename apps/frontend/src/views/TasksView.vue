@@ -293,19 +293,30 @@
         <el-divider content-position="left">运行配置</el-divider>
 
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="Few-shot 数量">
               <el-input-number v-model="taskForm.num_fewshot" :min="0" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="Batch Size">
               <el-input-number v-model="taskForm.batch_size" :min="1" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="样本限制">
               <el-input-number v-model="taskForm.limit" :min="1" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item>
+              <template #label>
+                <span>并发数</span>
+                <el-tooltip content="API 请求的并发数量。建议：OpenAI/DeepSeek 等 API 设为 10-100，个人 Key 或遇到 429 错误请设为 1-5" placement="top">
+                  <el-icon style="margin-left: 4px; cursor: help;"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <el-input-number v-model="taskForm.num_concurrent" :min="1" :max="1000" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -339,7 +350,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Monitor, Clock, View, Download, VideoPlay, VideoPause, Delete, CircleCheck, Loading } from '@element-plus/icons-vue'
+import { Plus, Refresh, Monitor, Clock, View, Download, VideoPlay, VideoPause, Delete, CircleCheck, Loading, QuestionFilled } from '@element-plus/icons-vue'
 import { tasksApi } from '../api/tasks'
 import { modelsApi } from '../api/models'
 import { datasetsApi } from '../api/datasets'
@@ -364,6 +375,7 @@ const taskForm = ref({
   tasks: [],
   num_fewshot: null,
   batch_size: null,
+  num_concurrent: null,  // 并发请求数
   limit: null,
   log_samples: true,
   apply_chat_template: false,
@@ -495,7 +507,7 @@ const handleModelSelect = async (modelId) => {
         model: selectedModel.model_name || '',
         base_url: selectedModel.base_url || '',
         api_key: selectedModel.api_key === '***' ? '(已保存，后端会自动使用)' : '(未设置)',
-        num_concurrent: selectedModel.max_concurrent || 1
+        num_concurrent: selectedModel.max_concurrent || 5
       }
       // 移除空值
       Object.keys(previewArgs).forEach(key => {
@@ -505,6 +517,9 @@ const handleModelSelect = async (modelId) => {
       })
       modelArgsStr.value = JSON.stringify(previewArgs, null, 2)
       taskForm.value.model_args = previewArgs
+      
+      // 同时设置任务表单中的并发数（用户可以覆盖）
+      taskForm.value.num_concurrent = selectedModel.max_concurrent || 5
     } else {
       ElMessage.warning('未找到选中的模型')
     }
@@ -581,6 +596,7 @@ const createTask = async () => {
       tasks: [],
       num_fewshot: null,
       batch_size: null,
+      num_concurrent: null,
       device: null,
       limit: null,
       log_samples: true,

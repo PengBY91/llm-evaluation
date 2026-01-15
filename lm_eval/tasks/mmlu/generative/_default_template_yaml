@@ -20,9 +20,14 @@ filter_list:
   - name: get_response
     filter:
       # Robust regex to extract the answer letter (A, B, C, or D)
-      # Supports: "Answer: D", "The answer is D", "**D**", or just "D" at start of response.
+      # Supports multiple formats:
+      # - "Answer: D", "The answer is D", "答案是 A", "选择 A"
+      # - Markdown bold: "**A**" or "(A)"
+      # - Answer at start: "A." or just "A"
+      # - Answer at end of line
       - function: "regex"
-        regex_pattern: "(?i)answer\\s*(?:is)?\\s*:?\\s*\\*?\\*?([A-D])\\*?\\*?|\\b([A-D])\\b"
+        regex_pattern: "(?i)(?:the\\s+)?(?:correct\\s+)?(?:answer|答案|选择?)[:\\s]*(?:is|为|是)?\\s*[:\\s]*\\*?\\*?\\(?([A-D])\\)?\\*?\\*?|^\\s*\\*?\\*?\\(?([A-D])\\)?\\*?\\*?\\s*[.。\\):]?\\s*$|(?:^|\\n)\\s*\\*?\\*?([A-D])\\*?\\*?\\s*[.。]|\\b([A-D])\\b(?=\\s*$|\\s*[.。])"
       - function: take_first
+
 metadata:
   version: 3.0

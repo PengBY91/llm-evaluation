@@ -10,9 +10,9 @@
 
     <el-table :data="models" v-loading="loading" stripe>
       <el-table-column prop="name" label="模型名称" width="200" />
-      <el-table-column prop="model_type" label="模型类型" width="150">
+      <el-table-column prop="backend_type" label="后端类型" width="150">
         <template #default="{ row }">
-          <el-tag size="small">{{ getModelTypeLabel(row.model_type) }}</el-tag>
+          <el-tag size="small">{{ getBackendTypeLabel(row.backend_type) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="model_name" label="模型标识" width="200">
@@ -48,27 +48,7 @@
         <el-form-item label="模型名称" prop="name" required>
           <el-input v-model="modelForm.name" placeholder="请输入模型名称" />
         </el-form-item>
-        <el-form-item label="模型类型" prop="model_type" required>
-          <el-select 
-            v-model="modelForm.model_type" 
-            placeholder="请选择模型类型"
-            style="width: 100%"
-            @change="handleModelTypeChange"
-          >
-            <el-option 
-              v-for="type in modelTypes" 
-              :key="type.value" 
-              :label="type.label" 
-              :value="type.value"
-            >
-              <div>
-                <div>{{ type.label }}</div>
-                <div style="font-size: 12px; color: #999;">{{ type.description }}</div>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="模型标识" prop="model_name" :required="needsModelName">
+        <el-form-item label="模型标识" prop="model_name" required>
           <el-input 
             v-model="modelForm.model_name" 
             placeholder="例如: gpt-3.5-turbo, qwen3:8b"
@@ -178,11 +158,11 @@ const testingModels = ref({})  // 跟踪每个模型的测试状态
 
 const modelForm = ref({
   name: '',
-  model_type: '',
+  backend_type: 'openai-api',
   description: '',
   base_url: '',
   api_key: '',
-  max_concurrent: null,
+  max_concurrent: 5,
   max_tokens: null,
   model_name: '',
   other_config: {}
@@ -190,28 +170,18 @@ const modelForm = ref({
 
 const rules = {
   name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
-  model_type: [{ required: true, message: '请选择模型类型', trigger: 'change' }]
+  model_name: [{ required: true, message: '请输入模型标识', trigger: 'blur' }]
 }
 
 const needsModelName = computed(() => {
-  if (!modelForm.value.model_type) return false
-  const type = modelTypes.value.find(t => t.value === modelForm.value.model_type)
-  return type && type.requires && type.requires.includes('model_name')
+  return true // openai-api always needs model_name now
 })
 
 const needsBaseUrl = computed(() => {
-  if (!modelForm.value.model_type) return false
-  const type = modelTypes.value.find(t => t.value === modelForm.value.model_type)
-  return type && type.requires && type.requires.includes('base_url')
+  return true // openai-api always needs base_url now
 })
 
-const needsPort = computed(() => {
-  if (!modelForm.value.model_type) return false
-  const type = modelTypes.value.find(t => t.value === modelForm.value.model_type)
-  return type && type.optional && type.optional.includes('port')
-})
-
-const getModelTypeLabel = (type) => {
+const getBackendTypeLabel = (type) => {
   const modelType = modelTypes.value.find(t => t.value === type)
   return modelType ? modelType.label : type
 }
@@ -230,7 +200,7 @@ const loadModels = async () => {
 const loadModelTypes = async () => {
   try {
     const response = await modelsApi.getModelTypes()
-    modelTypes.value = response.model_types || []
+    modelTypes.value = response.backend_types || []
   } catch (error) {
     console.error('加载模型类型失败:', error)
     // 使用默认类型
@@ -289,11 +259,11 @@ const cancelEdit = () => {
 const resetForm = () => {
   modelForm.value = {
     name: '',
-    model_type: 'openai-completions', // 默认设置为 openai-completions
+    backend_type: 'openai-api',
     description: '',
     base_url: '',
     api_key: '',
-    max_concurrent: null,
+    max_concurrent: 5,
     max_tokens: null,
     model_name: '',
     other_config: {}
@@ -305,8 +275,6 @@ const resetForm = () => {
   if (modelFormRef.value) {
     modelFormRef.value.resetFields()
   }
-  // 确保重置后 model_type 仍然是 openai-completions
-  modelForm.value.model_type = 'openai-completions'
 }
 
 const saveModel = async () => {
@@ -315,9 +283,9 @@ const saveModel = async () => {
   try {
     await modelFormRef.value.validate()
     
-    // 验证 API URL（如果需要）
-    if (needsBaseUrl.value && (!apiUrl.value || !apiUrl.value.trim())) {
-      ElMessage.error('该模型类型需要提供 API URL')
+    // 验证 API URL
+    if (!apiUrl.value || !apiUrl.value.trim()) {
+      ElMessage.error('需要提供 API URL')
       return
     }
     
@@ -487,30 +455,25 @@ const testModelConnection = async (model) => {
     return
   }
   
-  if (!model.model_type) {
-    ElMessage.warning('该模型未配置模型类型，无法测试连接')
+  if (!model.backend_type) {
+    ElMessage.warning('该模型未配置后端类型，无法测试连接')
     return
   }
   
-  // 检查是否需要模型标识
-  const type = modelTypes.value.find(t => t.value === model.model_type)
-  const requiresModelName = type && type.requires && type.requires.includes('model_name')
-  
-  if (requiresModelName && !model.model_name) {
-    ElMessage.warning('该模型类型需要提供模型标识才能进行测试')
+  if (!model.model_name) {
+    ElMessage.warning('该模型需要提供模型标识才能进行测试')
     return
   }
   
   testingModels.value[model.id] = true
   
   try {
-    // 传递 model_id，后端会从数据库获取真实的 api_key
     const testData = {
-      model_type: model.model_type,
+      backend_type: model.backend_type,
       base_url: model.base_url,
-      api_key: model.api_key === '***' ? undefined : model.api_key,  // 如果是隐藏值，传 undefined，让后端从数据库获取
+      api_key: model.api_key === '***' ? undefined : model.api_key,
       model_name: model.model_name || undefined,
-      model_id: model.id  // 传递 model_id，后端会从数据库获取真实的 api_key
+      model_id: model.id
     }
     
     const result = await modelsApi.testConnection(testData)
@@ -552,17 +515,8 @@ const testConnection = async () => {
     return
   }
   
-  if (!modelForm.value.model_type) {
-    ElMessage.warning('请先选择模型类型')
-    return
-  }
-  
-  // 检查是否需要模型标识
-  const type = modelTypes.value.find(t => t.value === modelForm.value.model_type)
-  const requiresModelName = type && type.requires && type.requires.includes('model_name')
-  
-  if (requiresModelName && !modelForm.value.model_name) {
-    ElMessage.warning('该模型类型需要提供模型标识才能进行测试')
+  if (!modelForm.value.model_name) {
+    ElMessage.warning('请先输入模型标识')
     return
   }
   
@@ -572,7 +526,7 @@ const testConnection = async () => {
   try {
     // 结合模型类型和模型标识进行测试
     const testData = {
-      model_type: modelForm.value.model_type,
+      backend_type: modelForm.value.backend_type,
       base_url: apiUrl.value.trim(),
       api_key: modelForm.value.api_key || undefined,
       model_name: modelForm.value.model_name || undefined

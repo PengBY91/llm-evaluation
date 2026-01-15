@@ -13,8 +13,8 @@ from pathlib import Path
 router = APIRouter()
 
 # 模型配置存储目录
-MODELS_DIR = Path(__file__).parent.parent.parent / "models"
-MODELS_DIR.mkdir(exist_ok=True)
+MODELS_DIR = Path(__file__).parent.parent.parent.parent / "assets" / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # 内存中的模型配置（使用文件持久化）
 models_db: Dict[str, Dict[str, Any]] = {}
@@ -26,7 +26,15 @@ def load_model_from_file(model_id: str) -> Optional[Dict[str, Any]]:
     if model_file.exists():
         try:
             with open(model_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                # 迁移逻辑：如果只有 model_type 而没有 backend_type，进行转换
+                if "model_type" in data and "backend_type" not in data:
+                    # 将旧的 openai-chat-completions 等统一映射到 openai-api
+                    if data["model_type"].startswith("openai-"):
+                        data["backend_type"] = "openai-api"
+                    else:
+                        data["backend_type"] = data["model_type"]
+                return data
         except Exception as e:
             print(f"读取模型文件失败 {model_id}: {e}")
             return None
@@ -90,6 +98,7 @@ class ModelResponse(BaseModel):
     id: str
     name: str
     backend_type: str
+    model_type: Optional[str] = None  # Kept for backward compatibility
     description: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None  # 返回时隐藏实际值
@@ -594,15 +603,15 @@ async def get_backend_types():
         "backend_types": [
             {
                 "value": "openai-api",
-                "label": "OpenAI-Compatible API",
-                "description": "OpenAI-compatible API servers (vLLM, Ollama, DeepSeek, OpenAI, etc.)",
+                "label": "OpenAI 兼容接口",
+                "description": "OpenAI 兼容的 API 服务 (vLLM, Ollama, DeepSeek, OpenAI 等)",
                 "requires": ["base_url", "model_name"],
                 "optional": ["api_key", "max_concurrent", "max_tokens"]
             },
             {
                 "value": "huggingface",
                 "label": "HuggingFace Transformers",
-                "description": "Local models using HuggingFace Transformers library",
+                "description": "使用 HuggingFace Transformers 库的本地模型",
                 "requires": ["model_name"],
                 "optional": ["max_tokens"]
             }
