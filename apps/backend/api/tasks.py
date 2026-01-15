@@ -671,6 +671,17 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                     
                     task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
                     task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
+            elif request.model == "openai-completions" and is_local_api:
+                # 关键修复：本地 API（Ollama, vLLM 等）使用 openai-completions 类型时
+                # 必须切换为 local-completions，避免触发 OpenAI 专属的模型限制检查
+                task_logger.info("检测到本地 API 使用 openai-completions，切换为 local-completions")
+                print("[INFO] 本地 API 服务自动切换: openai-completions -> local-completions")
+                
+                request.model = "local-completions"
+                # base_url 已经是 completions 端点，无需再次切换
+                
+                task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
+                task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
         elif request.model == "openai-chat-completions" and is_local_api:
             # 对于不需要 loglikelihood 的任务，本地 API 使用 local-chat-completions
             task_logger.info("本地 API 服务，使用 local-chat-completions 模型类型")
