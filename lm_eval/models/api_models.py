@@ -211,7 +211,14 @@ class TemplateAPI(TemplateLM):
                     try:
                         import tiktoken
 
-                        self.tokenizer = tiktoken.encoding_for_model(self.model)
+                        if isinstance(self.tokenizer, str):
+                            # Map user-friendly name cl100k_tiktoken to cl100k_base
+                            encoding_name = self.tokenizer
+                            if encoding_name == "cl100k_tiktoken":
+                                encoding_name = "cl100k_base"
+                            self.tokenizer = tiktoken.get_encoding(encoding_name)
+                        else:
+                            self.tokenizer = tiktoken.encoding_for_model(self.model)
                     except (ModuleNotFoundError, KeyError, ValueError) as e:
                         # 检查是否是 qwen3 模型
                         if self.model and self.model.lower().startswith("qwen3"):
@@ -276,15 +283,21 @@ class TemplateAPI(TemplateLM):
                     )
                     eval_logger.info(f"Using remote tokenizer from {self.base_url}")
             else:
-                import transformers
-
-                assert isinstance(tokenizer, str), "tokenizer must be a string"
-                self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-                    tokenizer,
-                    trust_remote_code=trust_remote_code,
-                    revision=revision,
-                    use_fast=use_fast_tokenizer,
-                )
+                if self.tokenizer_backend == "tiktoken":
+                    import tiktoken
+                    encoding_name = tokenizer
+                    if encoding_name == "cl100k_tiktoken":
+                        encoding_name = "cl100k_base"
+                    self.tokenizer = tiktoken.get_encoding(encoding_name)
+                else:
+                    import transformers
+                    assert isinstance(tokenizer, str), "tokenizer must be a string"
+                    self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+                        tokenizer,
+                        trust_remote_code=trust_remote_code,
+                        revision=revision,
+                        use_fast=use_fast_tokenizer,
+                    )
 
     @abc.abstractmethod
     def _create_payload(

@@ -108,6 +108,15 @@
             placeholder="可选，如果需要认证"
           />
         </el-form-item>
+        <el-form-item label="最大并发数">
+          <el-input-number 
+            v-model="modelForm.max_concurrent" 
+            :min="1" 
+            :max="1000"
+            style="width: 100%"
+          />
+          <div class="form-tip">建议：OpenAI/DeepSeek 等 API 建议设置为 10-100，如果是个人 Key 或遇到 429 错误请设为 1-5</div>
+        </el-form-item>
         
         <!-- 高级选项 -->
         <el-divider>
@@ -119,14 +128,6 @@
         
         <el-collapse-transition>
           <div v-show="showAdvancedOptions">
-            <el-form-item label="最大并发数">
-              <el-input-number 
-                v-model="modelForm.max_concurrent" 
-                :min="1" 
-                :max="100"
-                style="width: 100%"
-              />
-            </el-form-item>
             <el-form-item label="最长Token">
               <el-input-number 
                 v-model="modelForm.max_tokens" 

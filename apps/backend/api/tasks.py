@@ -12,6 +12,7 @@ import os
 import re
 from pathlib import Path
 import threading
+import multiprocessing
 import lm_eval
 # from lm_eval.tasks import TaskManager  # Moved to lazy loading
 # 导入模型相关的函数
@@ -95,6 +96,33 @@ RESULTS_DIR.mkdir(exist_ok=True)
 
 # 需要 loglikelihood 的输出类型
 LOGLIKELIHOOD_OUTPUT_TYPES = {"loglikelihood", "loglikelihood_rolling", "multiple_choice"}
+
+# 常用任务的生成式变体映射（用于不支持 loglikelihood 的模型）
+# 这些任务使用 generate_until 输出类型，通过正则匹配提取答案，无需 logprobs
+GENERATIVE_TASK_ALTERNATIVES = {
+    # MMLU 系列
+    "mmlu": "mmlu_generative",
+    # GPQA 系列
+    "gpqa": "gpqa_diamond_generative_n_shot",
+    "gpqa_diamond": "gpqa_diamond_generative_n_shot",
+    "gpqa_main": "gpqa_main_generative_n_shot",
+    "gpqa_extended": "gpqa_extended_generative_n_shot",
+    # TruthfulQA
+    "truthfulqa_mc1": "truthfulqa_gen",
+    "truthfulqa_mc2": "truthfulqa_gen",
+    # ARC (需要 arc_challenge_chat.yaml)
+    "arc_challenge": "arc_challenge_chat",
+}
+
+
+def get_generative_alternative(task_name: str) -> Optional[str]:
+    """
+    获取任务的生成式变体（如果存在）
+    
+    :param task_name: 原始任务名称
+    :return: 生成式变体名称，如果不存在则返回 None
+    """
+    return GENERATIVE_TASK_ALTERNATIVES.get(task_name.lower())
 
 
 def get_task_output_types(task_names: List[str]) -> Dict[str, str]:
@@ -367,6 +395,17 @@ class TaskResponse(BaseModel):
     results: Optional[Dict[str, Any]] = None  # 完整的评测结果（仅在 completed 状态且请求详情时返回）
 
 
+def run_evaluation_process_wrapper(task_id: str, request: TaskCreateRequest):
+    """
+    Process wrapper for run_evaluation to ensure process isolation.
+    This prevents os.environ changes from affecting other tasks and avoids GIL blocking.
+    """
+    p = multiprocessing.Process(target=run_evaluation, args=(task_id, request))
+    p.start()
+    # We don't join() here because we want it to run in background.
+    # The process will exit when run_evaluation finishes.
+
+
 def run_evaluation(task_id: str, request: TaskCreateRequest):
     """在后台运行评测任务"""
     import os
@@ -412,16 +451,50 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
     task_logger.info(f"日志文件: {log_file}")
     task_logger.info(f"=" * 60)
     
+    # 捕获标准输出和错误输出到日志
+    import sys
+    class LoggerWriter:
+        def __init__(self, logger, level):
+            self.logger = logger
+            self.level = level
+            self.buffer = ""
+        
+        def write(self, message):
+            if message:
+                self.buffer += message
+                if "\n" in self.buffer:
+                    lines = self.buffer.split("\n")
+                    for line in lines[:-1]:
+                        if line.strip():
+                            self.logger.log(self.level, line.strip())
+                    self.buffer = lines[-1]
+        
+        def flush(self):
+            if self.buffer.strip():
+                self.logger.log(self.level, self.buffer.strip())
+                self.buffer = ""
+
+    # 保存原始 stdout/stderr
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
+    # 重定向到 logger
+    sys.stdout = LoggerWriter(task_logger, logging.INFO)
+    sys.stderr = LoggerWriter(task_logger, logging.ERROR)
+    
     os.environ["HF_HOME"] = str(cache_dir / "huggingface")
     os.environ["HF_DATASETS_CACHE"] = str(cache_dir / "huggingface" / "datasets")
     os.environ["TRANSFORMERS_CACHE"] = str(cache_dir / "huggingface" / "transformers")
     
-    # 设置离线模式环境变量，确保不访问网络下载数据集和指标
-    os.environ["HF_DATASETS_OFFLINE"] = "1"
-    os.environ["HF_HUB_OFFLINE"] = "1"
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    # 设置离线模式环境变量，确保不访问网络下载数据集和指标 (除非用户显式允许)
+    if "HF_DATASETS_OFFLINE" not in os.environ:
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
+    if "HF_HUB_OFFLINE" not in os.environ:
+        os.environ["HF_HUB_OFFLINE"] = "1"
+    if "TRANSFORMERS_OFFLINE" not in os.environ:
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
     
-    task_logger.info(f"环境配置完成 - 离线模式: HF_DATASETS_OFFLINE=1")
+    task_logger.info(f"环境配置完成 - 离线模式: HF_DATASETS_OFFLINE={os.environ.get('HF_DATASETS_OFFLINE')}")
     task_logger.info(f"缓存目录: {cache_dir / 'huggingface'}")
     
     try:
@@ -501,23 +574,120 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                     print(f"[WARNING] 模型文件内容 keys: {list(model_data.keys()) if model_data else None}")
                 except Exception as e:
                     print(f"[WARNING] 无法加载模型文件: {e}")
+        # ========== 自动处理 DeepSeek 等 Chat 模型对 Loglikelihood 任务的支持问题 ==========
+        # DeepSeek 和其他部分 Chat 模型不支持 legacy completions 接口，也无法很好的支持 loglikelihood
+        # 因此，我们需要将这些任务替换为生成式版本（如 mmlu -> mmlu_flan_generative）
+        
+        is_deepseek = False
+        
+        # Check base_url
+        if request.model_args and "base_url" in request.model_args:
+            base_url = str(request.model_args["base_url"]).lower()
+            if "deepseek" in base_url:
+                is_deepseek = True
+                
+        # Check model name in args
+        if not is_deepseek and request.model_args and "model" in request.model_args:
+            model_name_arg = str(request.model_args["model"]).lower()
+            if "deepseek" in model_name_arg:
+                is_deepseek = True
+
+        # Check model configuration
+        if request.model_id:
+            try:
+                model_data = load_model_from_file(request.model_id)
+                if model_data:
+                    # Check API model name
+                    if "deepseek" in str(model_data.get("model_name", "")).lower():
+                        is_deepseek = True
+                    # Check user-defined display name
+                    if "deepseek" in str(model_data.get("name", "")).lower():
+                        is_deepseek = True
+            except Exception:
+                pass
+
+        if is_deepseek:
+            print("[INFO] 检测到 DeepSeek 模型，正在检查是否有需要替换的任务...")
+            tasks_modified = False
+            new_tasks = []
+            for task in request.tasks:
+                alt_task = get_generative_alternative(task)
+                if alt_task:
+                    print(f"[INFO] 将任务 '{task}' 替换为生成式变体 '{alt_task}' (适配 DeepSeek)")
+                    task_logger.info(f"自动替换任务: {task} -> {alt_task} (适配 DeepSeek Chat API)")
+                    new_tasks.append(alt_task)
+                    tasks_modified = True
+                else:
+                    new_tasks.append(task)
+            
+            if tasks_modified:
+                request.tasks = new_tasks
+                task_logger.info(f"替换后的任务列表: {request.tasks}")
         
         # ========== 自动切换模型类型（关键逻辑）==========
-        # 检测任务是否需要 loglikelihood，如果需要且当前是 chat completions，自动切换
+        # 检测任务是否需要 loglikelihood，如果需要，自动切换到支持的模型类型
         original_model_type = request.model
-        if request.model == "openai-chat-completions":
-            if requires_loglikelihood(request.tasks):
-                task_logger.info("检测到任务需要 loglikelihood，自动切换模型类型: openai-chat-completions -> openai-completions")
-                print("[INFO] 检测到任务需要 loglikelihood，自动从 openai-chat-completions 切换到 openai-completions")
-                
-                # 切换模型类型
-                request.model = "openai-completions"
-                
-                # 调整 API 端点
-                request.model_args = switch_to_completions_api(request.model_args)
-                
-                task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
-                task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
+        needs_loglikelihood = requires_loglikelihood(request.tasks)
+        
+        # 获取后端类型（从 model_id 或 model_args）
+        backend_type = None
+        if request.model_id:
+            try:
+                model_data = load_model_from_file(request.model_id)
+                if model_data:
+                    backend_type = model_data.get("backend_type")
+            except Exception:
+                pass
+        
+        # 判断是否为本地 API 服务（非官方 OpenAI）
+        base_url = request.model_args.get("base_url", "")
+        is_local_api = backend_type == "openai-api" or (
+            base_url and 
+            "api.openai.com" not in base_url and
+            "azure.com" not in base_url
+        )
+        
+        if needs_loglikelihood:
+            if request.model in ["openai-chat-completions", "local-chat-completions"]:
+                if is_local_api:
+                    # 本地 OpenAI 兼容服务（vLLM, Ollama 等）完全支持 loglikelihood
+                    task_logger.info("检测到任务需要 loglikelihood，自动切换模型类型: -> local-completions")
+                    print("[INFO] 检测到任务需要 loglikelihood，使用 local-completions（本地 API 支持 echo + logprobs）")
+                    
+                    request.model = "local-completions"
+                    request.model_args = switch_to_completions_api(request.model_args)
+                    
+                    task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
+                    task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
+                else:
+                    # 官方 OpenAI API：只有 babbage-002 和 davinci-002 支持
+                    task_logger.warning("检测到任务需要 loglikelihood，但使用的是官方 OpenAI API")
+                    task_logger.warning("官方 OpenAI 仅 babbage-002/davinci-002 支持 loglikelihood")
+                    print("[WARNING] 官方 OpenAI Chat API 不支持 loglikelihood，尝试切换到 openai-completions...")
+                    
+                    request.model = "openai-completions"
+                    request.model_args = switch_to_completions_api(request.model_args)
+                    
+                    task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
+                    task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
+        elif request.model == "openai-chat-completions" and is_local_api:
+            # 对于不需要 loglikelihood 的任务，本地 API 使用 local-chat-completions
+            task_logger.info("本地 API 服务，使用 local-chat-completions 模型类型")
+            request.model = "local-chat-completions"
+        
+        # DeepSeek 强制修复：如果是 DeepSeek 且启用了 chat template，必须使用 chat 模型类型
+        if is_deepseek and "completions" in request.model and "chat" not in request.model:
+            task_logger.info("检测到 DeepSeek 模型使用了错误的 openai-completions 类型，强制切换为 local-chat-completions")
+            request.model = "local-chat-completions"
+            
+            # 修复 URL (如果有必要)
+            if "base_url" in request.model_args:
+                base_url = request.model_args["base_url"]
+                if base_url.endswith("/completions/completions"):
+                     request.model_args["base_url"] = base_url.replace("/completions/completions", "/chat/completions")
+                elif base_url.endswith("/completions") and "chat" not in base_url:
+                     request.model_args["base_url"] = base_url.replace("/completions", "/chat/completions")
+                print(f"[INFO] DeepSeek 强制切换: model={request.model}, base_url={request.model_args['base_url']}")
         
         # 准备评测参数
         eval_kwargs = {
@@ -528,11 +698,11 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
 
 
         # 针对 API 模型自动优化并发参数
-        if request.model in ["openai-chat-completions", "openai-completions"]:
+        if request.model in ["openai-chat-completions", "openai-completions", "local-completions", "local-chat-completions"]:
             # 如果没有显式设置 num_concurrent，则设置默认值以提高并发性能
             # 默认值设为 100，这对于大多数现代 API 提供商（OpenAI, DeepSeek, vLLM 等）都是理想的并发值
             if "num_concurrent" not in request.model_args:
-                default_concurrent = 100
+                default_concurrent = 1 # 降低默认并发数，避免 429/500 Errors
                 request.model_args["num_concurrent"] = default_concurrent
                 print(f"[INFO] 自动优化: 为 API 模型设置 num_concurrent={default_concurrent}")
             
@@ -565,7 +735,11 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             eval_kwargs["limit"] = request.limit
         if request.log_samples is not None:
             eval_kwargs["log_samples"] = request.log_samples
-        if request.apply_chat_template is not None:
+        # DeepSeek 特殊处理：Chat 模型必须启用 chat template
+        if is_deepseek:
+            print("[INFO] 检测到 DeepSeek 模型，自动启用 apply_chat_template=True")
+            eval_kwargs["apply_chat_template"] = True
+        elif request.apply_chat_template is not None:
             eval_kwargs["apply_chat_template"] = request.apply_chat_template
         if request.gen_kwargs is not None:
             eval_kwargs["gen_kwargs"] = request.gen_kwargs
@@ -627,6 +801,8 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             }
             save_task_to_file(task_id, tasks_db[task_id])
 
+            save_task_to_file(task_id, tasks_db[task_id])
+
     except Exception as e:
         import traceback
         
@@ -647,16 +823,26 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
         
         # 检查是否是 Loglikelihood 不支持 chat completions 的错误
         if "Loglikelihood" in error_message and ("chat completions" in error_message.lower() or "multiple_choice" in error_message.lower()):
+            # 查找可用的生成式替代任务
+            alternative_tasks = []
+            for task in request.tasks:
+                alt = get_generative_alternative(task)
+                if alt:
+                    alternative_tasks.append(f"  • {task} → {alt}")
+            
+            alt_section = ""
+            if alternative_tasks:
+                alt_section = "\n可用的生成式替代任务：\n" + "\n".join(alternative_tasks) + "\n"
+            
             error_message = (
-                "错误：当前选择的模型类型（chat completions）不支持 Loglikelihood 类型的任务。\n\n"
-                "原因：OpenAI 的 chat completions API 不提供 prompt logprobs，因此无法运行需要 loglikelihood 的任务（如 multiple_choice 类型）。\n\n"
+                "错误：当前模型不支持 Loglikelihood 类型的任务。\n\n"
+                "原因：该模型的 API 不提供 prompt logprobs，无法运行需要 loglikelihood 的任务。\n\n"
                 "解决方案：\n"
-                "1. 使用支持 loglikelihood 的模型类型（如 'openai' 而不是 'openai-chat-completions'）\n"
-                "2. 或者选择使用 'generate_until' 输出类型的任务（如 mmlu_generative 而不是 mmlu）\n"
-                "3. 或者使用其他支持 loglikelihood 的模型（如 HuggingFace 模型）\n\n"
-                "相关链接：\n"
-                "- https://github.com/EleutherAI/lm-evaluation-harness/issues/942\n"
-                "- https://github.com/EleutherAI/lm-evaluation-harness/issues/1196"
+                "1. 【推荐】使用本地推理服务（如 Ollama、vLLM）：系统会自动切换到 local-completions 模型类型，完全支持 loglikelihood\n"
+                "2. 选择生成式任务变体（使用正则匹配而非概率计算）\n"
+                f"{alt_section}"
+                "3. 使用 HuggingFace 模型（需要 GPU）\n\n"
+                "技术说明：local-completions 通过 echo=True + logprobs 参数获取完整输入的 token 概率"
             )
         # 如果错误信息只是一个任务名称（如 'mmlu'），添加更多上下文
         # 检查是否是简单的任务名称格式（带引号或不带引号）
@@ -684,6 +870,13 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             tasks_db[task_id]["error_message"] = error_message
             tasks_db[task_id]["updated_at"] = datetime.now().isoformat()
             save_task_to_file(task_id, tasks_db[task_id])
+    
+    finally:
+        # 恢复标准输出和错误输出
+        if 'original_stdout' in locals():
+            sys.stdout = original_stdout
+        if 'original_stderr' in locals():
+            sys.stderr = original_stderr
 
 
 # 已移除 normalize_task_names 函数，因为现在应该直接使用正确的任务名称（从数据集对象的 task_name 字段获取）
@@ -703,16 +896,19 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         # 获取模型名称
         model_name = model_data.get("name")
         
-        # 使用模型数据构建 model_args
-        final_model_args = get_model_args(model_data)
+        # 获取后端类型和任务需求，确定 lm_eval model type
+        backend_type = model_data.get("backend_type", "openai-api")
+        from api.model_utils import determine_api_type
+        lm_eval_model_type = determine_api_type(backend_type, request.tasks)
+        
+        # 使用模型数据构建 model_args，传入确定的 api_type
+        final_model_args = get_model_args(model_data, api_type=lm_eval_model_type)
         # 如果请求中也提供了 model_args，合并它们（请求中的优先级更高）
         if request.model_args:
             final_model_args.update(request.model_args)
         
-        # 确保 model 类型与模型数据一致
-        if not request.model or request.model != model_data.get("model_type"):
-            # 如果请求中的 model 类型与模型数据不一致，使用模型数据中的类型
-            request.model = model_data.get("model_type", request.model)
+        # 设置 model 类型为自动确定的 lm_eval model type
+        request.model = lm_eval_model_type
     
     # 验证 model_args 是否存在
     if not final_model_args:
@@ -823,8 +1019,10 @@ async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTa
         config_id=request.config_id
     )
 
-    # 在后台运行评测（request_with_normalized_tasks 已包含构建好的 model_args）
-    background_tasks.add_task(run_evaluation, task_id, request_with_normalized_tasks)
+    # 在后台运行评测（使用多进程包装器）
+    # background_tasks.add_task(run_evaluation, task_id, request_with_normalized_tasks)
+    # 直接启动进程，不使用 background_tasks (因为它使用线程池)
+    run_evaluation_process_wrapper(task_id, request_with_normalized_tasks)
 
     return TaskResponse(**task_data)
 
@@ -873,7 +1071,8 @@ async def start_task(task_id: str, background_tasks: BackgroundTasks):
                 raise HTTPException(status_code=404, detail=f"模型不存在: {model_id}")
         
         original_request = TaskCreateRequest(**original_request_data)
-        background_tasks.add_task(run_evaluation, task_id, original_request)
+        # background_tasks.add_task(run_evaluation, task_id, original_request)
+        run_evaluation_process_wrapper(task_id, original_request)
         
     return {"message": "任务已启动"}
 
@@ -936,13 +1135,16 @@ async def list_tasks():
 async def get_task(task_id: str):
     """获取单个任务详情"""
     with tasks_lock:
-        # 如果内存中没有，尝试从文件加载
+        # 总是尝试从文件重新加载以获取最新状态（因为子进程更新了文件，但不会更新此进程的内存）
+        task_data = load_task_from_file(task_id)
+        if task_data:
+            # 只有当文件中的 updated_at 更新时才更新内存
+            current_task = tasks_db.get(task_id)
+            if not current_task or task_data.get("updated_at", "") >= current_task.get("updated_at", ""):
+                 tasks_db[task_id] = task_data
+        
         if task_id not in tasks_db:
-            task_data = load_task_from_file(task_id)
-            if task_data:
-                tasks_db[task_id] = task_data
-            else:
-                raise HTTPException(status_code=404, detail="任务不存在")
+             raise HTTPException(status_code=404, detail="任务不存在")
         
         task = tasks_db[task_id]
         
@@ -1067,7 +1269,17 @@ async def get_task_progress(task_id: str):
     """获取任务进度"""
     with tasks_lock:
         if task_id not in tasks_db:
-            raise HTTPException(status_code=404, detail="任务不存在")
+             # Try load from file first
+             task_data = load_task_from_file(task_id)
+             if task_data:
+                 tasks_db[task_id] = task_data
+             else:
+                 raise HTTPException(status_code=404, detail="任务不存在")
+        
+        # Reload checks
+        task_data = load_task_from_file(task_id)
+        if task_data:
+             tasks_db[task_id] = task_data
         
         task = tasks_db[task_id]
         

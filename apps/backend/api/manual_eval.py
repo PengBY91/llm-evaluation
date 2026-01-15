@@ -60,51 +60,38 @@ async def generate_answers(request: GenerateRequest):
             try:
                 print(f"DEBUG: Generating answer {i+1}/{request.n} for model {model_id} ({model_data.get('name')})")
                 answer = ""
-                if model_data["model_type"] in ["openai-chat-completions", "openai-completions"]:
-                    # 使用 requests 调用 OpenAI 兼容接口
+                backend_type = model_data.get("backend_type", "")
+                if backend_type == "openai-api":
+                    # Use requests to call OpenAI-compatible API
                     url = model_data["base_url"].strip()
                     
-                    # 处理端点路径
-                    if model_data["model_type"] == "openai-chat-completions":
-                        if not url.endswith("/chat/completions"):
-                            url = url.rstrip("/") + ("/chat/completions" if "/v1" in url else "/v1/chat/completions")
-                        payload = {
-                            "model": model_data["model_name"],
-                            "messages": [
-                                {"role": "system", "content": request.system_prompt},
-                                {"role": "user", "content": request.user_prompt}
-                            ],
-                            "max_tokens": request.max_tokens,
-                            "temperature": request.temperature,
-                            "n": 1 # 我们手动循环请求，或者让 API 支持 n（但为了不同模型统一，手动循环更稳）
-                        }
-                    else:
-                        if not url.endswith("/completions"):
-                            url = url.rstrip("/") + ("/completions" if "/v1" in url else "/v1/completions")
-                        payload = {
-                            "model": model_data["model_name"],
-                            "prompt": f"{request.system_prompt}\n\nUser: {request.user_prompt}\nAssistant:",
-                            "max_tokens": request.max_tokens,
-                            "temperature": request.temperature,
-                            "n": 1
-                        }
+                    # Handle endpoint path - always use chat/completions for generation
+                    if not url.endswith("/chat/completions"):
+                        url = url.rstrip("/") + ("/chat/completions" if "/v1" in url else "/v1/chat/completions")
+                    
+                    payload = {
+                        "model": model_data["model_name"],
+                        "messages": [
+                            {"role": "system", "content": request.system_prompt},
+                            {"role": "user", "content": request.user_prompt}
+                        ],
+                        "max_tokens": request.max_tokens,
+                        "temperature": request.temperature,
+                        "n": 1
+                    }
 
                     headers = {"Content-Type": "application/json"}
                     if model_data.get("api_key"):
                         headers["Authorization"] = f"Bearer {model_data['api_key']}"
                     
-                    # 增加超时时间到 120s
                     response = requests.post(url, json=payload, headers=headers, timeout=120)
                     if response.status_code == 200:
                         resp_json = response.json()
-                        if model_data["model_type"] == "openai-chat-completions":
-                            answer = resp_json["choices"][0]["message"]["content"]
-                        else:
-                            answer = resp_json["choices"][0]["text"]
+                        answer = resp_json["choices"][0]["message"]["content"]
                     else:
-                        raise Exception(f"API 返回错误: {response.status_code} {response.text}")
+                        raise Exception(f"API error: {response.status_code} {response.text}")
                 else:
-                    raise Exception(f"暂不支持模型类型: {model_data['model_type']}")
+                    raise Exception(f"Unsupported backend type: {backend_type}")
                     
                 results.append({
                     "model_id": model_id,

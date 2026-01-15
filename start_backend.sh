@@ -1,6 +1,6 @@
 #!/bin/bash
 # 启动后端服务
-set -x # Enable debug mode to see exactly where it hangs
+# set -x # Enable debug mode to see exactly where it hangs
 
 cd "$(dirname "$0")"
 

@@ -56,15 +56,15 @@ class ModelCreateRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
     
     name: str
-    model_type: str  # 模型类型：openai-chat-completions（支持 Ollama、vLLM 等）, openai-completions, hf
+    backend_type: str  # Backend type: openai-api (vLLM, Ollama, DeepSeek, etc.), huggingface, custom
     description: Optional[str] = None
-    base_url: Optional[str] = None  # 完整的 API URL，包含协议、主机、端口和路径
+    base_url: Optional[str] = None  # Complete API URL including protocol, host, port and path
     api_key: Optional[str] = None
-    port: Optional[int] = None  # 保留用于兼容旧数据，新数据应直接包含在 base_url 中
-    max_concurrent: Optional[int] = None  # 最大并发数
-    max_tokens: Optional[int] = None  # 最长 token
-    model_name: Optional[str] = None  # 模型名称（如 gpt-3.5-turbo）
-    other_config: Optional[Dict[str, Any]] = None  # 其他配置项
+    port: Optional[int] = None  # Kept for compatibility with old data
+    max_concurrent: Optional[int] = None  # Maximum concurrent requests
+    max_tokens: Optional[int] = None  # Maximum tokens
+    model_name: Optional[str] = None  # Model name (e.g. gpt-3.5-turbo)
+    other_config: Optional[Dict[str, Any]] = None  # Other configuration
 
 
 class ModelUpdateRequest(BaseModel):
@@ -72,7 +72,7 @@ class ModelUpdateRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
     
     name: Optional[str] = None
-    model_type: Optional[str] = None
+    backend_type: Optional[str] = None
     description: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
@@ -89,7 +89,7 @@ class ModelResponse(BaseModel):
     
     id: str
     name: str
-    model_type: str
+    backend_type: str
     description: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None  # 返回时隐藏实际值
@@ -110,81 +110,70 @@ def save_model_to_file(model_id: str, model_data: Dict[str, Any]):
         json.dump(model_data, f, ensure_ascii=False, indent=2)
 
 
-def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
-    """根据模型配置生成 model_args"""
+def get_model_args(model: Dict[str, Any], api_type: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Generate model_args based on model configuration and optionally specified API type.
+    
+    Args:
+        model: Model configuration dictionary
+        api_type: Optional API type override (e.g., 'openai-chat-completions', 'openai-completions')
+                 If not provided, base_url will be returned as-is without endpoint modification
+    
+    Returns:
+        model_args dictionary for lm_eval
+    """
     model_args = {}
     
     if model.get("model_name"):
         model_args["model"] = model["model_name"]
     
-    # base_url 应该包含完整的 URL（包括端口和路径）
-    # 如果旧数据有单独的 port，需要合并
+    # base_url handling
     base_url = model.get("base_url", "")
     port = model.get("port")
-    model_type = model.get("model_type", "")
+    backend_type = model.get("backend_type", "")
     
-    if base_url:
-        # 如果有单独的 port 且 base_url 中没有端口，则合并
-        if port and ":" not in base_url.split("//")[1].split("/")[0]:
-            from urllib.parse import urlparse, urlunparse
-            try:
-                parsed = urlparse(base_url)
-                # 构建包含端口的新 URL
-                netloc = f"{parsed.hostname}:{port}" if parsed.hostname else ""
-                base_url = urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-            except Exception:
-                # 如果解析失败，简单拼接
-                if "://" in base_url:
-                    parts = base_url.split("://", 1)
-                    base_url = f"{parts[0]}://{parts[1].split('/')[0]}:{port}{'/' + '/'.join(parts[1].split('/')[1:]) if '/' in parts[1] else ''}"
-                else:
-                    base_url = f"{base_url}:{port}"
-        
-        # DeepSeek API 特殊处理：如果包含 api.deepseek.com，不要自动添加 /v1/chat/completions 后缀
-        # 因为 DeepSeek 的 base_url 通常是 https://api.deepseek.com
-        # 如果自动添加后缀，可能会变成 https://api.deepseek.com/v1/chat/completions/v1/chat/completions
-        # lm-eval 库会自动处理 endpoint，我们只需要提供 base URL
-        
-        # 修正：对于 DeepSeek API，base_url 应该是 https://api.deepseek.com
-        # lm-eval 库内部会自动调用 /chat/completions 端点
-        # 但如果我们在这里添加了 /v1/chat/completions，lm-eval 可能会调用 https://api.deepseek.com/v1/chat/completions/chat/completions
-        
-        # 实际上，lm-eval 的 openai 接口需要的是 base_url，它会自动添加 /chat/completions (如果需要)
-        # 但是，这取决于 lm-eval 版本和具体的接口实现。
-        # 观察用户报错：Invalid URL (POST /v1) - 这表明请求发往了 /v1 而不是完整的 URL
-        # 这通常意味着 base_url 解析有问题，或者 lm-eval 期望 base_url 不包含路径
-        
-        # 智能处理 base_url：检查是否已包含完整的端点路径
-        # 如果没有，根据模型类型自动补全
+    #  Merge port into base_url if needed (for legacy data)
+    if base_url and port and ":" not in base_url.split("//")[1].split("/")[0]:
+        from urllib.parse import urlparse, urlunparse
+        try:
+            parsed = urlparse(base_url)
+            netloc = f"{parsed.hostname}:{port}" if parsed.hostname else ""
+            base_url = urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+        except Exception:
+            if "://" in base_url:
+                parts = base_url.split("://", 1)
+                base_url = f"{parts[0]}://{parts[1].split('/')[0]}:{port}{'/' + '/'.join(parts[1].split('/')[1:]) if '/' in parts[1] else ''}"
+            else:
+                base_url = f"{base_url}:{port}"
+    
+    # Add API-specific endpoint if api_type is specified
+    if base_url and api_type and backend_type == "openai-api":
         from urllib.parse import urlparse
         parsed = urlparse(base_url)
         
-        # 判断是否已经包含完整的端点路径
         has_chat_completions = parsed.path.endswith('/chat/completions')
         has_completions = parsed.path.endswith('/completions') and not has_chat_completions
         
-        if model_type == "openai-chat-completions" and not has_chat_completions:
-            # 需要添加 /chat/completions
+        if api_type == "openai-chat-completions" and not has_chat_completions:
+            # Add /chat/completions endpoint
             if parsed.path.endswith('/v1'):
                 base_url = base_url + '/chat/completions'
             elif parsed.path and parsed.path != '/':
-                # 如果有其他路径（如 /api, /v2），在末尾追加
                 base_url = base_url.rstrip('/') + '/chat/completions'
             else:
-                # 没有路径或只有 /，添加完整路径
                 base_url = base_url.rstrip('/') + '/v1/chat/completions'
                 
-        elif model_type == "openai-completions" and not has_completions:
-            # 需要添加 /completions
+        elif api_type == "openai-completions" and not has_completions:
+            # Add /completions endpoint
             if parsed.path.endswith('/v1'):
                 base_url = base_url + '/completions'
             elif parsed.path and parsed.path != '/':
-                # 如果有其他路径，在末尾追加
                 base_url = base_url.rstrip('/') + '/completions'
             else:
-                # 没有路径或只有 /，添加完整路径
                 base_url = base_url.rstrip('/') + '/v1/completions'
         
+        model_args["base_url"] = base_url
+    elif base_url:
         model_args["base_url"] = base_url
     
     if model.get("max_concurrent"):
@@ -196,33 +185,26 @@ def get_model_args(model: Dict[str, Any]) -> Dict[str, Any]:
     if model.get("api_key"):
         model_args["api_key"] = model["api_key"]
     
-    # 合并其他配置
+    # Merge other config
     if model.get("other_config"):
         model_args.update(model["other_config"])
     
-    # --- 核心修复：自动处理 Tokenizer 映射 ---
-    # 如果用户没有显式提供 tokenizer，针对已知模型或模型类型提供默认值
-    if "tokenizer" not in model_args:
+    # Automatic tokenizer handling for OpenAI-compatible APIs
+    if "tokenizer" not in model_args and backend_type == "openai-api":
         model_name = model.get("model_name", "").lower()
         
-        # 定义本地分词器路径
-        local_tokenizer_path = Path(__file__).parent.parent.parent / "tokenizers" / "gpt-4"
-        tokenizer_val = "gpt-4"
-        if local_tokenizer_path.exists():
-            tokenizer_val = str(local_tokenizer_path.absolute())
-            print(f"[DEBUG] 使用本地分词器路径: {tokenizer_val}")
-        
-        # 针对 DeepSeek 模型
+        # For DeepSeek and other non-standard OpenAI models, use cl100k_tiktoken
         if "deepseek" in model_name:
-            model_args["tokenizer"] = tokenizer_val
-            print(f"[INFO] 自动为 DeepSeek 模型 '{model_name}' 设置 tokenizer='{tokenizer_val}'")
-            
-        # 对于所有 OpenAI 兼容接口，如果模型名不被识别
-        elif model_type in ["openai-chat-completions", "openai-completions"]:
+            model_args["tokenizer"] = "cl100k_tiktoken"
+            model_args["tokenizer_backend"] = "tiktoken"
+            print(f"[INFO] Auto-configured tokenizer='cl100k_tiktoken' for DeepSeek model '{model_name}'")
+        else:
+            # Check if it's a standard OpenAI model
             standard_openai_models = ["gpt-3.5", "gpt-4", "text-davinci", "gpt-o1", "gpt-4o"]
             if not any(std in model_name for std in standard_openai_models):
-                model_args["tokenizer"] = tokenizer_val
-                print(f"[INFO] 自动为 OpenAI 兼容模型 '{model_name}' 设置 tokenizer='{tokenizer_val}'")
+                model_args["tokenizer"] = "cl100k_tiktoken"
+                model_args["tokenizer_backend"] = "tiktoken"
+                print(f"[INFO] Auto-configured tokenizer='cl100k_tiktoken' for OpenAI-compatible model '{model_name}'")
         
     return model_args
 
@@ -236,7 +218,7 @@ async def create_model(request: ModelCreateRequest):
         model_data = {
             "id": model_id,
             "name": request.name,
-            "model_type": request.model_type,
+            "backend_type": request.backend_type,
             "description": request.description,
             "base_url": request.base_url,
             "api_key": request.api_key,
@@ -285,14 +267,14 @@ async def list_models():
 
 
 class ModelTestRequest(BaseModel):
-    """测试模型连接请求"""
+    """Test model connection request"""
     model_config = {"protected_namespaces": ()}
     
-    model_type: str
-    base_url: Optional[str] = None  # 完整的 API URL
+    backend_type: str  # 'openai-api', 'huggingface', etc.
+    base_url: Optional[str] = None
     api_key: Optional[str] = None
     model_name: Optional[str] = None
-    model_id: Optional[str] = None  # 如果提供 model_id，将从数据库获取真实的 api_key
+    model_id: Optional[str] = None
 
 
 @router.post("/test-connection")
@@ -329,13 +311,13 @@ async def test_model_connection(request: ModelTestRequest):
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         
-        if request.model_type in ["openai-chat-completions", "openai-completions"]:
-            # OpenAI 兼容 API - 需要模型标识进行测试
+        if request.backend_type == "openai-api":
+            # OpenAI-compatible API - requires model name for testing
             if not request.model_name:
                 return {
                     "success": False,
-                    "message": "缺少模型标识",
-                    "details": f"模型类型 {request.model_type} 需要提供模型标识（model_name）才能进行测试"
+                    "message": "Missing model name",
+                    "details": f"Backend type {request.backend_type} requires model_name for testing"
                 }
             
             # 首先尝试调用 /models 端点，验证 API 可访问性并检查模型是否存在
@@ -380,43 +362,23 @@ async def test_model_connection(request: ModelTestRequest):
             
             # 构建 completions 端点 URL
             completions_url = test_url.rstrip('/')
-            # 检查 URL 是否已经包含完整的端点路径
+            # Check if URL already has endpoint path
             if not (completions_url.endswith('/chat/completions') or completions_url.endswith('/completions')):
-                # 如果 URL 以 /v1 结尾，说明是基础 URL，需要添加端点路径
+                # For testing, always use /chat/completions
                 if completions_url.endswith('/v1'):
-                    if request.model_type == "openai-chat-completions":
-                        completions_url = completions_url + '/chat/completions'
-                    else:
-                        completions_url = completions_url + '/completions'
-                # 如果 URL 包含 /v1 但不以 /v1 结尾，可能是其他路径
+                    completions_url = completions_url + '/chat/completions'
                 elif '/v1' in completions_url:
-                    # URL 已经包含 /v1，可能不需要再添加
-                    if request.model_type == "openai-chat-completions":
-                        if not completions_url.endswith('/chat/completions'):
-                            completions_url = completions_url.rstrip('/') + '/chat/completions'
-                    else:
-                        if not completions_url.endswith('/completions'):
-                            completions_url = completions_url.rstrip('/') + '/completions'
-                # 如果 URL 不包含 /v1，添加完整的路径
+                    if not completions_url.endswith('/chat/completions'):
+                        completions_url = completions_url.rstrip('/') + '/chat/completions'
                 else:
-                    if request.model_type == "openai-chat-completions":
-                        completions_url = completions_url.rstrip('/') + '/v1/chat/completions'
-                    else:
-                        completions_url = completions_url.rstrip('/') + '/v1/completions'
+                    completions_url = completions_url.rstrip('/') + '/v1/chat/completions'
             
-            # 根据模型类型构建不同的测试 payload，使用实际的模型名称
-            if request.model_type == "openai-chat-completions":
-                test_payload = {
-                    "model": request.model_name,
-                    "messages": [{"role": "user", "content": "Hello"}],
-                    "max_tokens": 5
-                }
-            else:
-                test_payload = {
-                    "model": request.model_name,
-                    "prompt": "Hello",
-                    "max_tokens": 5
-                }
+            # For openai-api backend, always use chat/completions format for testing
+            test_payload = {
+                "model": request.model_name,
+                "messages": [{"role": "user", "content": "Hello"}],
+                "max_tokens": 5
+            }
             
             try:
                 response = requests.post(
@@ -502,25 +464,25 @@ async def test_model_connection(request: ModelTestRequest):
                     "details": f"错误: {str(e)}"
                 }
         
-        elif request.model_type == "hf":
-            # HuggingFace 模型 - 本地模型，主要检查配置
+        elif request.backend_type == "huggingface":
+            # HuggingFace - local model, mainly check config
             if not request.model_name:
                 return {
                     "success": False,
-                    "message": "缺少模型标识",
-                    "details": "HuggingFace 模型需要提供模型标识（model_name）"
+                    "message": "Missing model name",
+                    "details": "HuggingFace backend requires model_name"
                 }
             return {
                 "success": True,
-                "message": "配置检查通过",
-                "details": f"HuggingFace 模型 '{request.model_name}' 配置正确（注意：此测试仅验证配置，实际模型加载将在评测时进行）"
+                "message": "Configuration check passed",
+                "details": f"HuggingFace model '{request.model_name}' config is valid (Note: actual model loading happens during evaluation)"
             }
         
         else:
             return {
                 "success": False,
-                "message": "不支持的模型类型",
-                "details": f"模型类型 {request.model_type} 暂不支持连接测试"
+                "message": "Unsupported backend type",
+                "details": f"Backend type {request.backend_type} is not supported for connection testing"
             }
     
     except HTTPException:
@@ -626,30 +588,23 @@ async def delete_model(model_id: str):
 
 
 @router.get("/types/list")
-async def get_model_types():
-    """获取支持的模型类型列表"""
+async def get_backend_types():
+    """Get supported backend types list"""
     return {
-        "model_types": [
+        "backend_types": [
             {
-                "value": "openai-chat-completions",
-                "label": "OpenAI Chat Completions",
-                "description": "OpenAI 兼容的聊天完成 API（支持 Ollama、vLLM、OpenAI 等）",
+                "value": "openai-api",
+                "label": "OpenAI-Compatible API",
+                "description": "OpenAI-compatible API servers (vLLM, Ollama, DeepSeek, OpenAI, etc.)",
                 "requires": ["base_url", "model_name"],
                 "optional": ["api_key", "max_concurrent", "max_tokens"]
             },
             {
-                "value": "openai-completions",
-                "label": "OpenAI Completions",
-                "description": "OpenAI 兼容的文本完成 API",
-                "requires": ["base_url", "model_name"],
-                "optional": ["api_key", "max_concurrent", "max_tokens"]
-            },
-            {
-                "value": "hf",
-                "label": "HuggingFace",
-                "description": "HuggingFace Transformers 本地模型",
+                "value": "huggingface",
+                "label": "HuggingFace Transformers",
+                "description": "Local models using HuggingFace Transformers library",
                 "requires": ["model_name"],
-                "optional": ["port", "max_tokens"]
+                "optional": ["max_tokens"]
             }
         ]
     }
