@@ -93,6 +93,112 @@ tasks_lock = threading.Lock()
 RESULTS_DIR = Path(__file__).parent.parent.parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
+# 需要 loglikelihood 的输出类型
+LOGLIKELIHOOD_OUTPUT_TYPES = {"loglikelihood", "loglikelihood_rolling", "multiple_choice"}
+
+
+def get_task_output_types(task_names: List[str]) -> Dict[str, str]:
+    """
+    获取任务列表中每个任务的 output_type
+    
+    :param task_names: 任务名称列表
+    :return: 任务名称到输出类型的映射
+    """
+    from lm_eval import utils
+    
+    output_types = {}
+    tm = get_task_manager()
+    
+    for task_name in task_names:
+        try:
+            # 尝试从 TaskManager 获取任务配置
+            if hasattr(tm, '_get_config'):
+                config = tm._get_config(task_name)
+                if config and 'output_type' in config:
+                    output_types[task_name] = config['output_type']
+                    continue
+            
+            # 如果是 CachedTaskManager，尝试从 YAML 文件直接读取
+            if hasattr(tm, 'task_index') and task_name in tm.task_index:
+                yaml_path = tm.task_index[task_name]
+                if yaml_path and yaml_path != -1:
+                    try:
+                        config = utils.load_yaml_config(yaml_path, mode="full")
+                        if config and 'output_type' in config:
+                            output_types[task_name] = config['output_type']
+                            continue
+                    except Exception:
+                        pass
+            
+            # 默认: 如果任务名包含 'generative' 或 'gen'，假设是 generate_until
+            if 'generative' in task_name.lower() or '_gen' in task_name.lower():
+                output_types[task_name] = 'generate_until'
+            else:
+                # 常见的 loglikelihood 任务
+                loglikelihood_task_patterns = [
+                    'mmlu', 'hellaswag', 'arc', 'winogrande', 'piqa', 
+                    'lambada', 'sciq', 'boolq', 'openbookqa', 'copa',
+                    'rte', 'wsc', 'wic', 'multirc', 'record', 'cb',
+                    'storycloze', 'swag', 'siqa', 'truthfulqa_mc'
+                ]
+                is_loglikelihood = any(
+                    pattern in task_name.lower() 
+                    for pattern in loglikelihood_task_patterns
+                )
+                if is_loglikelihood:
+                    output_types[task_name] = 'multiple_choice'
+                else:
+                    output_types[task_name] = 'unknown'
+                    
+        except Exception as e:
+            print(f"[DEBUG] 无法获取任务 '{task_name}' 的 output_type: {e}")
+            output_types[task_name] = 'unknown'
+    
+    return output_types
+
+
+def requires_loglikelihood(task_names: List[str]) -> bool:
+    """
+    判断任务列表中是否有任务需要 loglikelihood
+    
+    :param task_names: 任务名称列表
+    :return: 是否需要 loglikelihood
+    """
+    output_types = get_task_output_types(task_names)
+    
+    for task_name, output_type in output_types.items():
+        if output_type in LOGLIKELIHOOD_OUTPUT_TYPES:
+            print(f"[DEBUG] 任务 '{task_name}' 需要 loglikelihood (output_type={output_type})")
+            return True
+    
+    return False
+
+
+def switch_to_completions_api(model_args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    将 chat completions API 切换为 completions API
+    
+    :param model_args: 原始模型参数
+    :return: 修改后的模型参数
+    """
+    new_args = model_args.copy()
+    
+    if 'base_url' in new_args:
+        base_url = new_args['base_url']
+        # 将 /chat/completions 替换为 /completions
+        if '/chat/completions' in base_url:
+            new_args['base_url'] = base_url.replace('/chat/completions', '/completions')
+            print(f"[INFO] 自动切换 API 端点: {base_url} -> {new_args['base_url']}")
+        elif '/v1' in base_url and not base_url.endswith('/completions'):
+            # 如果是 /v1 结尾，添加 /completions
+            if base_url.endswith('/v1'):
+                new_args['base_url'] = base_url + '/completions'
+            else:
+                new_args['base_url'] = base_url.rstrip('/') + '/completions'
+            print(f"[INFO] 自动添加 completions 端点: {base_url} -> {new_args['base_url']}")
+    
+    return new_args
+
 
 def patch_tokenizer():
     """解决部分 lm-eval 版本中对 transformers 分词器调用不存在的 encode_batch 方法的 Bug"""
@@ -396,12 +502,30 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                 except Exception as e:
                     print(f"[WARNING] 无法加载模型文件: {e}")
         
+        # ========== 自动切换模型类型（关键逻辑）==========
+        # 检测任务是否需要 loglikelihood，如果需要且当前是 chat completions，自动切换
+        original_model_type = request.model
+        if request.model == "openai-chat-completions":
+            if requires_loglikelihood(request.tasks):
+                task_logger.info("检测到任务需要 loglikelihood，自动切换模型类型: openai-chat-completions -> openai-completions")
+                print("[INFO] 检测到任务需要 loglikelihood，自动从 openai-chat-completions 切换到 openai-completions")
+                
+                # 切换模型类型
+                request.model = "openai-completions"
+                
+                # 调整 API 端点
+                request.model_args = switch_to_completions_api(request.model_args)
+                
+                task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
+                task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
+        
         # 准备评测参数
         eval_kwargs = {
             "model": request.model,
             "model_args": request.model_args,
             "tasks": request.tasks,
         }
+
 
         # 针对 API 模型自动优化并发参数
         if request.model in ["openai-chat-completions", "openai-completions"]:
