@@ -331,13 +331,48 @@ def rebuild_dataset_index() -> List[Dict[str, Any]]:
                     except Exception as e:
                         print(f"扫描数据集组 {dataset_name} 的第 subtasks 失败: {e}")
                 
-                # 验证任务名称
+                # 验证并获取正确的 lm-eval 任务名称
                 if task_manager is not None:
                     try:
-                        if dataset_name in task_manager.all_groups:
-                            parent_info["tags"].append("lm_eval_group")
-                        elif dataset_name in task_manager.all_subtasks:
+                        # 先检查是否存在完全匹配
+                        valid_task_name = None
+                        
+                        if dataset_name in task_manager.task_index:
+                            valid_task_name = dataset_name
                             parent_info["tags"].append("lm_eval_task")
+                        elif dataset_name in task_manager.all_groups:
+                            valid_task_name = dataset_name
+                            parent_info["tags"].append("lm_eval_group")
+                        else:
+                            # 尝试变体名称（文件夹用下划线，但 lm-eval 可能用连字符）
+                            variants = [
+                                dataset_name.replace("_", "-"),  # super_glue -> super-glue
+                                dataset_name.replace("-", "_"),  # super-glue -> super_glue
+                                f"{dataset_name}_generative",    # mmlu -> mmlu_generative
+                                f"{dataset_name}-lm-eval-v1",    # super-glue -> super-glue-lm-eval-v1
+                                f"{dataset_name.replace('_', '-')}-lm-eval-v1",  # super_glue -> super-glue-lm-eval-v1
+                            ]
+                            
+                            for variant in variants:
+                                if variant in task_manager.task_index:
+                                    valid_task_name = variant
+                                    parent_info["tags"].append("lm_eval_task")
+                                    print(f"[DEBUG] 任务名称映射: {dataset_name} -> {variant}")
+                                    break
+                                elif variant in task_manager.all_groups:
+                                    valid_task_name = variant
+                                    parent_info["tags"].append("lm_eval_group")
+                                    print(f"[DEBUG] 任务名称映射(组): {dataset_name} -> {variant}")
+                                    break
+                        
+                        # 更新 task_name 为正确的 lm-eval 任务名称
+                        if valid_task_name:
+                            parent_info["task_name"] = valid_task_name
+                        else:
+                            # 标记为无效任务，警告用户
+                            parent_info["tags"].append("invalid_task_name")
+                            print(f"[WARNING] 找不到有效的 lm-eval 任务: {dataset_name}")
+                            
                     except Exception as e:
                         print(f"验证任务名称失败 {dataset_name}: {e}")
                 

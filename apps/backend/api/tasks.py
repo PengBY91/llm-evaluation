@@ -683,26 +683,32 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             
             # 修复 URL (更加鲁棒的 URL 规范化，解决 404 /chat/chat/completions 问题)
             if "base_url" in request.model_args:
-                base_url = request.model_args["base_url"]
+                base_url = request.model_args["base_url"].rstrip("/")
                 
-                # 循环剥离已有的后缀，直到回退到根路径或 /v1 之前的路径
-                temp_url = base_url
-                for _ in range(3):
-                    temp_url = temp_url.rstrip("/")
-                    if temp_url.endswith("/completions"):
-                        temp_url = temp_url[:-12]
-                    elif temp_url.endswith("/chat"):
-                        temp_url = temp_url[:-5]
-                    elif temp_url.endswith("/v1"):
-                        temp_url = temp_url[:-3]
+                # 如果 URL 已经正确以 /chat/completions 结尾，不需要修改
+                if base_url.endswith("/chat/completions"):
+                    print(f"[INFO] DeepSeek URL 已正确: {base_url}")
+                    task_logger.info(f"DeepSeek 强制切换: model={request.model}, base_url={base_url} (保持不变)")
+                else:
+                    # 循环剥离已有的后缀，直到回退到基础路径
+                    temp_url = base_url
+                    for _ in range(3):
+                        temp_url = temp_url.rstrip("/")
+                        if temp_url.endswith("/completions"):
+                            temp_url = temp_url[:-12]
+                        elif temp_url.endswith("/chat"):
+                            temp_url = temp_url[:-5]
+                        else:
+                            break
+                    
+                    # 检查是否已有 /v1，避免重复添加
+                    if temp_url.endswith("/v1"):
+                        request.model_args["base_url"] = temp_url + "/chat/completions"
                     else:
-                        break
-                
-                # 重新构造成标准的 /v1/chat/completions
-                request.model_args["base_url"] = temp_url.rstrip("/") + "/v1/chat/completions"
-                
-                print(f"[INFO] DeepSeek 规范化 URL: {base_url} -> {request.model_args['base_url']}")
-                task_logger.info(f"DeepSeek 强制切换: model={request.model}, base_url={request.model_args['base_url']}")
+                        request.model_args["base_url"] = temp_url.rstrip("/") + "/v1/chat/completions"
+                    
+                    print(f"[INFO] DeepSeek 规范化 URL: {base_url} -> {request.model_args['base_url']}")
+                    task_logger.info(f"DeepSeek 强制切换: model={request.model}, base_url={request.model_args['base_url']}")
         
         # 准备评测参数
         eval_kwargs = {
