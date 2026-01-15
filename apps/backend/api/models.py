@@ -156,32 +156,47 @@ def get_model_args(model: Dict[str, Any], api_type: Optional[str] = None) -> Dic
                 base_url = f"{base_url}:{port}"
     
     # Add API-specific endpoint if api_type is specified
-    if base_url and api_type and backend_type == "openai-api":
-        from urllib.parse import urlparse
-        parsed = urlparse(base_url)
+    # Support multiple model types: openai-*, local-completions, local-chat-completions
+    if base_url and api_type:
+        # Check if this is an OpenAI-compatible API that needs endpoint path added
+        is_openai_compatible = (
+            backend_type == "openai-api" or 
+            api_type.startswith("openai-") or 
+            api_type.startswith("local-")
+        )
         
-        has_chat_completions = parsed.path.endswith('/chat/completions')
-        has_completions = parsed.path.endswith('/completions') and not has_chat_completions
-        
-        if api_type == "openai-chat-completions" and not has_chat_completions:
-            # Add /chat/completions endpoint
-            if parsed.path.endswith('/v1'):
-                base_url = base_url + '/chat/completions'
-            elif parsed.path and parsed.path != '/':
-                base_url = base_url.rstrip('/') + '/chat/completions'
-            else:
-                base_url = base_url.rstrip('/') + '/v1/chat/completions'
-                
-        elif api_type == "openai-completions" and not has_completions:
-            # Add /completions endpoint
-            if parsed.path.endswith('/v1'):
-                base_url = base_url + '/completions'
-            elif parsed.path and parsed.path != '/':
-                base_url = base_url.rstrip('/') + '/completions'
-            else:
-                base_url = base_url.rstrip('/') + '/v1/completions'
-        
-        model_args["base_url"] = base_url
+        if is_openai_compatible:
+            from urllib.parse import urlparse
+            parsed = urlparse(base_url)
+            
+            has_chat_completions = parsed.path.endswith('/chat/completions')
+            has_completions = parsed.path.endswith('/completions') and not has_chat_completions
+            
+            # Determine which endpoint to add based on api_type
+            needs_chat_completions = api_type in ["openai-chat-completions", "local-chat-completions"]
+            needs_completions = api_type in ["openai-completions", "local-completions"]
+            
+            if needs_chat_completions and not has_chat_completions:
+                # Add /chat/completions endpoint
+                if parsed.path.endswith('/v1'):
+                    base_url = base_url + '/chat/completions'
+                elif parsed.path and parsed.path != '/':
+                    base_url = base_url.rstrip('/') + '/chat/completions'
+                else:
+                    base_url = base_url.rstrip('/') + '/v1/chat/completions'
+                    
+            elif needs_completions and not has_completions:
+                # Add /completions endpoint
+                if parsed.path.endswith('/v1'):
+                    base_url = base_url + '/completions'
+                elif parsed.path and parsed.path != '/':
+                    base_url = base_url.rstrip('/') + '/completions'
+                else:
+                    base_url = base_url.rstrip('/') + '/v1/completions'
+            
+            model_args["base_url"] = base_url
+        else:
+            model_args["base_url"] = base_url
     elif base_url:
         model_args["base_url"] = base_url
     

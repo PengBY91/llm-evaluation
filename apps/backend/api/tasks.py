@@ -97,21 +97,37 @@ RESULTS_DIR.mkdir(exist_ok=True)
 # 需要 loglikelihood 的输出类型
 LOGLIKELIHOOD_OUTPUT_TYPES = {"loglikelihood", "loglikelihood_rolling", "multiple_choice"}
 
-# 常用任务的生成式变体映射（用于不支持 loglikelihood 的模型）
-# 这些任务使用 generate_until 输出类型，通过正则匹配提取答案，无需 logprobs
+# 常用任务的生成式变体映射（用于不支持 prompt logprobs 的后端，如 Ollama）
+# 这些任务使用 generate_until 输出类型，通过正则匹配提取答案，无需 echo + logprobs
+# 注意：只包含在 lm-eval 中真正存在的任务变体
 GENERATIVE_TASK_ALTERNATIVES = {
-    # MMLU 系列
+    # ========== MMLU 系列 ==========
     "mmlu": "mmlu_generative",
-    # GPQA 系列
+    
+    # ========== GPQA 系列 ==========
     "gpqa": "gpqa_diamond_generative_n_shot",
     "gpqa_diamond": "gpqa_diamond_generative_n_shot",
     "gpqa_main": "gpqa_main_generative_n_shot",
     "gpqa_extended": "gpqa_extended_generative_n_shot",
-    # TruthfulQA
+    # CoT (Chain-of-Thought) 变体也可用
+    "gpqa_diamond_cot": "gpqa_diamond_cot_n_shot",
+    "gpqa_main_cot": "gpqa_main_cot_n_shot",
+    "gpqa_extended_cot": "gpqa_extended_cot_n_shot",
+    
+    # ========== TruthfulQA ==========
     "truthfulqa_mc1": "truthfulqa_gen",
     "truthfulqa_mc2": "truthfulqa_gen",
-    # ARC (需要 arc_challenge_chat.yaml)
+    
+    # ========== ARC 系列 ==========
+    # 注意：arc_challenge_chat 是 lm-eval 中存在的 chat 变体
     "arc_challenge": "arc_challenge_chat",
+    
+    # ========== 其他任务 ==========
+    # 注意：hellaswag, winogrande, piqa, boolq 等任务
+    # 在 lm-eval 中没有内置的生成式变体
+    # 如果需要评测这些任务，可以：
+    # 1. 使用支持 logprobs 的后端（如 vLLM）
+    # 2. 自定义任务配置文件（见 lm-eval 文档）
 }
 
 
@@ -200,6 +216,68 @@ def requires_loglikelihood(task_names: List[str]) -> bool:
             return True
     
     return False
+
+
+def check_logprobs_support(base_url: str, model_name: str = "") -> bool:
+    """
+    检测后端是否支持 lm-eval 所需的 prompt logprobs（用于 loglikelihood 评测）
+    
+    注意：这里检测的是 Completions API 的 echo=True + logprobs 功能，
+    而不是 Chat Completions API 的 logprobs=True（仅返回生成 token 的概率）。
+    
+    lm-eval 的 loglikelihood 评测需要：
+    - Completions API (/v1/completions)
+    - echo=True: 返回完整的 prompt tokens
+    - logprobs=N: 返回每个 token 的对数概率
+    
+    不支持 prompt logprobs 的后端:
+    - Ollama: Completions API 不支持 echo 和 logprobs 参数（虽然 Chat API 支持 logprobs）
+    - DeepSeek: 仅提供 Chat API，不支持 prompt logprobs
+    - OpenAI 官方 Chat API: Chat Completions 不返回 prompt logprobs
+    
+    支持 prompt logprobs 的后端:
+    - vLLM: 完全支持 Completions API 的 echo + logprobs
+    - OpenAI Completions API: babbage-002, davinci-002 支持
+    - text-generation-inference: 支持
+    
+    :param base_url: API 基础 URL
+    :param model_name: 模型名称（用于额外检测）
+    :return: True 如果支持 prompt logprobs，False 否则
+    """
+    base_url_lower = base_url.lower() if base_url else ""
+    model_name_lower = model_name.lower() if model_name else ""
+    
+    # Ollama: 不支持 logprobs
+    # 检测端口 11434（Ollama 默认端口）或 URL 中包含 ollama
+    if ":11434" in base_url_lower or "ollama" in base_url_lower:
+        print("[DEBUG] 检测到 Ollama 后端，不支持 logprobs")
+        return False
+    
+    # DeepSeek: Chat API 不支持 logprobs
+    if "deepseek" in base_url_lower or "deepseek" in model_name_lower:
+        print("[DEBUG] 检测到 DeepSeek 后端，不支持 logprobs")
+        return False
+    
+    # OpenAI 官方 API: Chat Completions 不支持 prompt logprobs
+    # 只有 babbage-002 和 davinci-002 的 Completions API 支持
+    if "api.openai.com" in base_url_lower:
+        supported_models = ["babbage-002", "davinci-002"]
+        if any(m in model_name_lower for m in supported_models):
+            print(f"[DEBUG] 检测到 OpenAI 官方 API，模型 {model_name} 支持 logprobs")
+            return True
+        else:
+            print(f"[DEBUG] 检测到 OpenAI 官方 API，模型 {model_name} 不支持 prompt logprobs")
+            return False
+    
+    # Azure OpenAI: 通常不支持 prompt logprobs
+    if "azure.com" in base_url_lower or "azure" in base_url_lower:
+        print("[DEBUG] 检测到 Azure OpenAI，不支持 prompt logprobs")
+        return False
+    
+    # 其他本地 API 服务（vLLM, text-generation-inference 等）
+    # 默认假设支持 logprobs
+    print("[DEBUG] 检测到非 Ollama/DeepSeek 的本地 API，假设支持 logprobs")
+    return True
 
 
 def switch_to_completions_api(model_args: Dict[str, Any]) -> Dict[str, Any]:
@@ -515,8 +593,9 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                 model_data = load_model_from_file(request.model_id)
                 if model_data:
                     # 使用 get_model_args 重新构建 model_args，确保 base_url 包含正确路径
+                    # 重要：传递 api_type 参数，让 get_model_args 正确添加 API 端点路径
                     from api.models import get_model_args
-                    rebuilt_model_args = get_model_args(model_data)
+                    rebuilt_model_args = get_model_args(model_data, api_type=request.model)
                     # 合并原有的 model_args（保留用户自定义的参数）
                     rebuilt_model_args.update(request.model_args)
                     request.model_args = rebuilt_model_args
@@ -632,11 +711,14 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
         
         # 获取后端类型（从 model_id 或 model_args）
         backend_type = None
+        model_name_for_check = request.model_args.get("model", "")
         if request.model_id:
             try:
                 model_data = load_model_from_file(request.model_id)
                 if model_data:
                     backend_type = model_data.get("backend_type")
+                    if not model_name_for_check:
+                        model_name_for_check = model_data.get("model_name", "")
             except Exception:
                 pass
         
@@ -648,10 +730,59 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             "azure.com" not in base_url
         )
         
+        # ========== 智能任务切换：检测后端是否支持 logprobs ==========
+        supports_logprobs = check_logprobs_support(base_url, model_name_for_check)
+        
+        if needs_loglikelihood and not supports_logprobs:
+            # 后端不支持 logprobs，需要切换到生成式任务变体
+            task_logger.warning(f"检测到后端不支持 logprobs，尝试将任务切换为生成式变体")
+            print(f"[INFO] 后端不支持 logprobs (base_url={base_url[:50]}...)，检查可用的生成式任务变体")
+            
+            original_tasks = request.tasks.copy()
+            new_tasks = []
+            tasks_switched = []
+            tasks_no_alternative = []
+            
+            for task in request.tasks:
+                alt_task = get_generative_alternative(task)
+                if alt_task:
+                    new_tasks.append(alt_task)
+                    tasks_switched.append(f"{task} -> {alt_task}")
+                    task_logger.info(f"任务自动切换: {task} -> {alt_task} (后端不支持 logprobs)")
+                else:
+                    # 没有可用的生成式变体，保留原任务（可能会失败）
+                    new_tasks.append(task)
+                    tasks_no_alternative.append(task)
+            
+            if tasks_switched:
+                request.tasks = new_tasks
+                print(f"[INFO] 已自动切换任务: {', '.join(tasks_switched)}")
+                task_logger.info(f"任务列表已更新: {original_tasks} -> {new_tasks}")
+                
+                # 任务已切换为生成式，不再需要 loglikelihood，使用 chat completions
+                needs_loglikelihood = False
+                if request.model in ["openai-completions", "local-completions"]:
+                    if is_local_api:
+                        request.model = "local-chat-completions"
+                    else:
+                        request.model = "openai-chat-completions"
+                    task_logger.info(f"模型类型切换为 chat completions: {original_model_type} -> {request.model}")
+                    # 切换 URL 到 chat/completions
+                    if "base_url" in request.model_args:
+                        base_url = request.model_args["base_url"]
+                        if "/completions" in base_url and "/chat/completions" not in base_url:
+                            request.model_args["base_url"] = base_url.replace("/completions", "/chat/completions")
+                            print(f"[INFO] API 端点切换: {base_url} -> {request.model_args['base_url']}")
+            
+            if tasks_no_alternative:
+                task_logger.warning(f"以下任务没有可用的生成式变体，可能会失败: {tasks_no_alternative}")
+                print(f"[WARNING] 以下任务没有生成式变体，后端不支持 logprobs，评测可能失败: {tasks_no_alternative}")
+        
+        # ========== 模型类型自动切换 ==========
         if needs_loglikelihood:
             if request.model in ["openai-chat-completions", "local-chat-completions"]:
                 if is_local_api:
-                    # 本地 OpenAI 兼容服务（vLLM, Ollama 等）完全支持 loglikelihood
+                    # 本地 OpenAI 兼容服务（vLLM 等）支持 loglikelihood
                     task_logger.info("检测到任务需要 loglikelihood，自动切换模型类型: -> local-completions")
                     print("[INFO] 检测到任务需要 loglikelihood，使用 local-completions（本地 API 支持 echo + logprobs）")
                     
@@ -672,7 +803,7 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
                     task_logger.info(f"模型类型已切换: {original_model_type} -> {request.model}")
                     task_logger.info(f"API 端点: {request.model_args.get('base_url')}")
             elif request.model == "openai-completions" and is_local_api:
-                # 关键修复：本地 API（Ollama, vLLM 等）使用 openai-completions 类型时
+                # 关键修复：本地 API（vLLM 等）使用 openai-completions 类型时
                 # 必须切换为 local-completions，避免触发 OpenAI 专属的模型限制检查
                 task_logger.info("检测到本地 API 使用 openai-completions，切换为 local-completions")
                 print("[INFO] 本地 API 服务自动切换: openai-completions -> local-completions")
@@ -771,8 +902,17 @@ def run_evaluation(task_id: str, request: TaskCreateRequest):
             eval_kwargs["limit"] = request.limit
         if request.log_samples is not None:
             eval_kwargs["log_samples"] = request.log_samples
+        
+        # 关键修复：completions API（loglikelihood 任务）不兼容 apply_chat_template
+        # apply_chat_template 会将输入转换为 JsonChatStr 对象，而 completions API 需要纯文本
+        if request.model in ["local-completions", "openai-completions"]:
+            if request.apply_chat_template:
+                task_logger.warning("检测到 apply_chat_template=True，但 completions API 不支持 chat template")
+                task_logger.warning("自动禁用 apply_chat_template 以兼容 loglikelihood 任务")
+                print("[WARNING] completions API 不支持 apply_chat_template，已自动禁用")
+            eval_kwargs["apply_chat_template"] = False
         # DeepSeek 特殊处理：Chat 模型必须启用 chat template
-        if is_deepseek:
+        elif is_deepseek:
             print("[INFO] 检测到 DeepSeek 模型，自动启用 apply_chat_template=True")
             eval_kwargs["apply_chat_template"] = True
         elif request.apply_chat_template is not None:
