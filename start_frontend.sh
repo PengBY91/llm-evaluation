@@ -1,7 +1,7 @@
 #!/bin/bash
 # 启动前端应用
 
-cd "$(dirname "$0")/web_frontend"
+cd "$(dirname "$0")/apps/frontend"
 
 # 检查是否已安装依赖
 if [ ! -d "node_modules" ]; then

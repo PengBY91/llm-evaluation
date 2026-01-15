@@ -10,11 +10,24 @@ env/
 cache/
 *.env
 
-models/
+# Assets
+assets/models/
+assets/data/
+# Note: assets/tokenizers and assets/templates are tracked
+
+# Outputs
+outputs/
+
+# Legacy ignore (can be cleaned up later if sure)
 results/
 tasks/
+output/
+data/
+models/
 
-
+# Frontend
+apps/frontend/node_modules/
+apps/frontend/dist/
 web_frontend/node_modules/
 
 # Python bytecode and build artifacts
@@ -34,16 +47,6 @@ dist/
 profile_default/
 ipython_config.py
 
-# Output and data
-output/
-data/
-temp/
-test_logs/
-
-# Caching
-lm_eval/caching/.cache
-lm_cache/
-
 # Logging
 *.log
 logs/
@@ -55,5 +58,5 @@ examples/wandb/
 # PyInstaller
 *.spec
 
-#uv
+# uv
 uv.lock

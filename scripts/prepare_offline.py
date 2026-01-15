@@ -27,8 +27,8 @@ import shutil
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-METRICS_CACHE_DIR = PROJECT_ROOT / "cache" / "metrics"
+DATA_DIR = PROJECT_ROOT / "assets" / "data"
+METRICS_CACHE_DIR = PROJECT_ROOT / "outputs" / "cache" / "metrics"
 
 # 常用评测指标列表 (HuggingFace evaluate 库)
 COMMON_METRICS = [
@@ -168,8 +168,8 @@ def download_metrics(metrics: List[str] = None, force: bool = False):
 
 def create_offline_config():
     """创建离线模式配置文件"""
-    config_path = PROJECT_ROOT / "offline_config.json"
-    cache_dir = PROJECT_ROOT / "cache"
+    config_path = PROJECT_ROOT / "configs" / "offline_config.json"
+    cache_dir = PROJECT_ROOT / "outputs" / "cache"
     hf_cache_dir = cache_dir / "huggingface"
     
     config = {
@@ -249,7 +249,7 @@ def main():
     args = parser.parse_args()
     
     # 设置缓存目录到项目根目录
-    cache_dir = PROJECT_ROOT / "cache"
+    cache_dir = PROJECT_ROOT / "outputs" / "cache"
     cache_dir.mkdir(exist_ok=True)
     
     hf_cache_dir = cache_dir / "huggingface"
